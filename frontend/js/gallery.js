@@ -64,6 +64,23 @@ const GalleryUtils = {
             title: title,
             items: groups[title]
         }));
+    },
+
+    getAspectRatio(width, height) {
+        if (!width || !height) return null;
+        const gcd = (a, b) => (b === 0 ? a : gcd(b, a % b));
+        const divisor = gcd(width, height);
+        const rW = width / divisor;
+        const rH = height / divisor;
+        if (rW === rH) return '1:1 Persegi';
+        if (rW === 16 && rH === 9) return '16:9 Landscape';
+        if (rW === 9 && rH === 16) return '9:16 Portrait';
+        if (rW === 4 && rH === 3) return '4:3 Standar';
+        if (rW === 3 && rH === 4) return '3:4 Portrait';
+        if (rW === 3 && rH === 2) return '3:2 Klasik';
+        if (rW === 2 && rH === 3) return '2:3 Portrait';
+        const ratio = (width / height).toFixed(2);
+        return `${rW}:${rH} (${ratio})`;
     }
 };
 

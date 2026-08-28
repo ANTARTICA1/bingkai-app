@@ -64,7 +64,7 @@
         </template>
     </div>
 
-    <div x-show="gamepadConnected" class="fixed bottom-4 sm:bottom-5 inset-x-0 mx-auto max-w-xl z-40 px-4 pointer-events-none">
+    <div x-show="gamepadConnected && !isViewerOpen" class="fixed bottom-4 sm:bottom-5 inset-x-0 mx-auto max-w-xl z-40 px-4 pointer-events-none">
         <div class="pointer-events-auto p-2.5 rounded-2xl glass-panel shadow-2xl flex items-center justify-around text-[11px] font-bold text-slate-700 dark:text-slate-200 border border-brand-500/40 backdrop-blur-xl">
             <span class="flex items-center gap-1.5"><kbd class="px-1.5 py-0.5 rounded bg-emerald-500 text-white font-black text-[10px] shadow">A</kbd> Buka</span>
             <span class="flex items-center gap-1.5"><kbd class="px-1.5 py-0.5 rounded bg-rose-500 text-white font-black text-[10px] shadow">B</kbd> Tutup</span>
@@ -253,6 +253,13 @@
                     </div>
 
                     <div class="flex items-center gap-2 sm:gap-3">
+                        <button @click="isShortcutsModalOpen = true" title="Panduan Tombol & Pintasan (?)"
+                                class="flex items-center gap-1 px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-brand-50 dark:hover:bg-brand-900/30 text-slate-700 dark:text-slate-300 text-xs font-semibold transition border border-slate-200 dark:border-slate-700">
+                            <i data-lucide="keyboard" class="w-4 h-4 text-brand-500"></i>
+                            <span class="hidden sm:inline">Pintasan</span>
+                            <kbd class="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700 font-mono text-[10px]">?</kbd>
+                        </button>
+
                         <div x-show="gamepadConnected" class="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-xs font-semibold">
                             <i data-lucide="gamepad-2" class="w-4 h-4"></i>
                             <span x-text="gamepadName"></span>
@@ -871,98 +878,347 @@
         </div>
     </div>
 
-    <div x-show="isViewerOpen" class="fixed inset-0 z-50 flex bg-black/95 backdrop-blur-md"
+    <div x-show="isViewerOpen" class="fixed inset-0 z-50 flex bg-slate-950/98 backdrop-blur-2xl"
          @click.self="closeViewer()">
         <template x-if="activePhoto">
-            <div class="flex-1 flex flex-col md:flex-row h-full overflow-hidden">
-                <div class="flex-1 relative flex items-center justify-center p-4 min-w-0 select-none">
-                    <button @click="closeViewer()"
-                            class="absolute top-4 left-4 z-20 p-2.5 rounded-full bg-white/10 hover:bg-white/20 text-white backdrop-blur-md transition">
-                        <i data-lucide="x" class="w-5 h-5"></i>
-                    </button>
+            <div class="flex-1 flex flex-col lg:flex-row h-full overflow-hidden">
+                
+                <div class="flex-1 relative flex flex-col h-full overflow-hidden select-none bg-radial from-slate-900/60 to-black">
+                    
+                    <div class="h-16 px-6 flex items-center justify-between z-30 border-b border-white/10 bg-slate-950/60 backdrop-blur-md">
+                        <div class="flex items-center gap-3">
+                            <button @click="closeViewer()"
+                                    class="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold transition border border-white/10 shadow">
+                                <i data-lucide="arrow-left" class="w-4 h-4"></i>
+                                <span>Tutup</span>
+                                <kbd class="px-1.5 py-0.5 rounded bg-black/40 text-slate-300 font-mono text-[10px]">ESC</kbd>
+                            </button>
 
-                    <button @click="prevPhoto()" :disabled="activePhotoIndex <= 0"
-                            class="absolute left-4 z-20 p-3 rounded-full bg-white/10 hover:bg-white/20 text-white backdrop-blur-md disabled:opacity-20 transition">
-                        <i data-lucide="chevron-left" class="w-6 h-6"></i>
-                    </button>
-                    <button @click="nextPhoto()" :disabled="activePhotoIndex >= photos.length - 1"
-                            class="absolute right-4 z-20 p-3 rounded-full bg-white/10 hover:bg-white/20 text-white backdrop-blur-md disabled:opacity-20 transition">
-                        <i data-lucide="chevron-right" class="w-6 h-6"></i>
-                    </button>
+                            <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-xs font-medium text-slate-300">
+                                <i data-lucide="image" class="w-3.5 h-3.5 text-brand-400"></i>
+                                <span x-text="'Foto ' + (activePhotoIndex + 1) + ' dari ' + photos.length"></span>
+                            </div>
+                        </div>
 
-                    <img :src="getOrigUrl(activePhoto.id)" :alt="activePhoto.filename"
-                         class="max-h-full max-w-full object-contain rounded-lg shadow-2xl transition-transform duration-200">
+                        <div class="flex items-center gap-1.5">
+                            <button @click="zoomOut()" title="Perkecil (-)"
+                                    class="p-2 rounded-xl bg-white/5 hover:bg-white/15 text-slate-300 hover:text-white transition border border-white/10 flex items-center gap-1">
+                                <i data-lucide="zoom-out" class="w-4 h-4"></i>
+                                <span class="text-[10px] font-mono text-slate-400 hidden sm:inline">-</span>
+                            </button>
+                            
+                            <span class="text-xs font-mono font-bold px-2 py-1 bg-white/5 rounded-lg border border-white/10 text-slate-300"
+                                  x-text="Math.round(zoomLevel * 100) + '%'"></span>
+
+                            <button @click="zoomIn()" title="Perbesar (+)"
+                                    class="p-2 rounded-xl bg-white/5 hover:bg-white/15 text-slate-300 hover:text-white transition border border-white/10 flex items-center gap-1">
+                                <i data-lucide="zoom-in" class="w-4 h-4"></i>
+                                <span class="text-[10px] font-mono text-slate-400 hidden sm:inline">+</span>
+                            </button>
+
+                            <button @click="rotatePhoto()" title="Putar 90 Derajat (R)"
+                                    class="p-2 rounded-xl bg-white/5 hover:bg-white/15 text-slate-300 hover:text-white transition border border-white/10 ml-1 flex items-center gap-1">
+                                <i data-lucide="rotate-cw" class="w-4 h-4"></i>
+                                <span class="text-[10px] font-mono text-slate-400 hidden sm:inline">R</span>
+                            </button>
+
+                            <button @click="resetZoom()" title="Reset Tampilan (0)"
+                                    class="p-2 rounded-xl bg-white/5 hover:bg-white/15 text-slate-300 hover:text-white transition border border-white/10 flex items-center gap-1">
+                                <i data-lucide="maximize" class="w-4 h-4"></i>
+                                <span class="text-[10px] font-mono text-slate-400 hidden sm:inline">0</span>
+                            </button>
+
+                            <button @click="isShortcutsModalOpen = true" title="Lihat Semua Pintasan Tombol (?)"
+                                    class="p-2 rounded-xl bg-brand-500/20 hover:bg-brand-500/30 text-brand-300 transition border border-brand-500/30 ml-2 flex items-center gap-1 text-xs font-semibold">
+                                <i data-lucide="help-circle" class="w-4 h-4"></i>
+                                <span class="hidden sm:inline">Bantuan</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="flex-1 relative flex items-center justify-center p-6 min-w-0 overflow-hidden">
+                        <button @click="prevPhoto()" :disabled="activePhotoIndex <= 0"
+                                class="absolute left-6 z-20 p-3.5 rounded-2xl bg-black/60 hover:bg-brand-600 text-white backdrop-blur-xl border border-white/10 disabled:opacity-20 disabled:cursor-not-allowed shadow-2xl transition transform hover:scale-105 active:scale-95 flex items-center gap-2">
+                            <i data-lucide="chevron-left" class="w-6 h-6"></i>
+                        </button>
+                        
+                        <button @click="nextPhoto()" :disabled="activePhotoIndex >= photos.length - 1"
+                                class="absolute right-6 z-20 p-3.5 rounded-2xl bg-black/60 hover:bg-brand-600 text-white backdrop-blur-xl border border-white/10 disabled:opacity-20 disabled:cursor-not-allowed shadow-2xl transition transform hover:scale-105 active:scale-95 flex items-center gap-2">
+                            <i data-lucide="chevron-right" class="w-6 h-6"></i>
+                        </button>
+
+                        <div class="flex items-center justify-center max-h-full max-w-full overflow-hidden p-2 rounded-2xl">
+                            <img :src="getOrigUrl(activePhoto.id)" :alt="activePhoto.filename"
+                                 :style="`transform: scale(${zoomLevel}) rotate(${rotationDeg}deg); max-height: 75vh; max-width: 100%;`"
+                                 class="object-contain rounded-xl shadow-2xl transition-transform duration-200 ease-out border border-white/10">
+                        </div>
+                    </div>
+
+                    <div class="h-12 px-6 flex items-center justify-center z-30 border-t border-white/10 bg-slate-950/80 backdrop-blur-md">
+                        <div class="flex flex-wrap items-center justify-center gap-3 sm:gap-6 text-[11px] font-medium text-slate-400">
+                            <span class="flex items-center gap-1.5"><kbd class="px-1.5 py-0.5 rounded bg-white/10 font-mono text-[10px] text-slate-300">Panah Kiri/Kanan</kbd> Ganti Foto</span>
+                            <span class="flex items-center gap-1.5"><kbd class="px-1.5 py-0.5 rounded bg-white/10 font-mono text-[10px] text-slate-300">+/-</kbd> Zoom</span>
+                            <span class="flex items-center gap-1.5"><kbd class="px-1.5 py-0.5 rounded bg-white/10 font-mono text-[10px] text-slate-300">R</kbd> Putar</span>
+                            <span class="flex items-center gap-1.5"><kbd class="px-1.5 py-0.5 rounded bg-white/10 font-mono text-[10px] text-slate-300">F</kbd> Favorit</span>
+                            <span class="flex items-center gap-1.5"><kbd class="px-1.5 py-0.5 rounded bg-white/10 font-mono text-[10px] text-slate-300">ESC</kbd> Tutup</span>
+                            
+                            <template x-if="gamepadConnected">
+                                <span class="flex items-center gap-1 text-emerald-400 font-bold border-l border-white/10 pl-3">
+                                    <i data-lucide="gamepad-2" class="w-3.5 h-3.5"></i>
+                                    <span>Stick: (A) Zoom, (B) Tutup, (X) Favorit, (Y) Rename</span>
+                                </span>
+                            </template>
+                        </div>
+                    </div>
                 </div>
 
-                <div class="w-full md:w-80 bg-slate-900 border-t md:border-t-0 md:border-l border-white/10 p-6 flex flex-col justify-between overflow-y-auto text-slate-200">
-                    <div class="space-y-4">
-                        <div class="flex items-start justify-between gap-2">
-                            <div class="truncate">
-                                <h3 class="font-bold text-base text-white truncate" x-text="activePhoto.filename"></h3>
-                                <p class="text-xs text-slate-400 uppercase tracking-wider mt-0.5" x-text="activePhoto.extension.replace('.', '') + ' FILE'"></p>
+                <div class="w-full lg:w-[420px] bg-slate-900 border-t lg:border-t-0 lg:border-l border-white/10 p-6 flex flex-col justify-between overflow-y-auto text-slate-200">
+                    <div class="space-y-6">
+                        
+                        <div>
+                            <div class="flex items-start justify-between gap-3">
+                                <div class="flex-1 min-w-0">
+                                    <span class="text-[10px] font-mono uppercase tracking-widest text-brand-400 font-bold px-2 py-0.5 bg-brand-500/10 border border-brand-500/20 rounded-md inline-block mb-1.5"
+                                          x-text="activePhoto.extension.replace('.', '') + ' IMAGE'"></span>
+                                    <h3 class="font-extrabold text-lg text-white break-all leading-snug" x-text="activePhoto.filename"></h3>
+                                </div>
+
+                                <button @click="toggleFavoriteActive()" title="Tandai Favorit [F / X]"
+                                        class="p-3 rounded-2xl border transition flex-shrink-0 shadow flex flex-col items-center gap-1"
+                                        :class="activePhoto.favorite ? 'bg-rose-500/20 border-rose-500/40 text-rose-500' : 'bg-white/5 border-white/10 text-slate-400 hover:text-white'">
+                                    <i data-lucide="heart" class="w-5 h-5" :class="activePhoto.favorite ? 'fill-current' : ''"></i>
+                                    <span class="text-[9px] font-mono opacity-60">F / X</span>
+                                </button>
                             </div>
-                            <button @click="toggleFavoriteActive()"
-                                    class="p-2 rounded-xl border border-white/10 hover:bg-white/10 transition"
-                                    :class="activePhoto.favorite ? 'text-rose-500' : 'text-slate-400'">
-                                <i data-lucide="heart" class="w-5 h-5" :class="activePhoto.favorite ? 'fill-current' : ''"></i>
-                            </button>
+
+                            <div class="flex flex-wrap items-center gap-2 mt-3 text-[11px]">
+                                <span class="px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-slate-300 font-medium"
+                                      x-text="formatRatio(activePhoto.width, activePhoto.height) || 'Rasio Standar'"></span>
+                                <span class="px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-semibold flex items-center gap-1">
+                                    <i data-lucide="check" class="w-3 h-3"></i>
+                                    <span>Terindeks SHA-256</span>
+                                </span>
+                            </div>
                         </div>
 
-                        <div class="grid grid-cols-2 gap-2 pt-2">
-                            <button @click="openRenameModal()"
-                                    class="p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-semibold flex items-center justify-center gap-1.5 transition">
-                                <i data-lucide="edit-3" class="w-3.5 h-3.5 text-brand-400"></i>
-                                <span>Ubah Nama</span>
-                            </button>
+                        <div>
+                            <div class="flex items-center justify-between mb-2.5">
+                                <p class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Aksi Cepat</p>
+                                <span class="text-[10px] text-slate-500 font-medium">Bisa diklik atau pakai keyboard/stik</span>
+                            </div>
 
-                            <button @click="openMoveModal()"
-                                    class="p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-semibold flex items-center justify-center gap-1.5 transition">
-                                <i data-lucide="folder-input" class="w-3.5 h-3.5 text-amber-400"></i>
-                                <span>Pindah Folder</span>
-                            </button>
+                            <div class="grid grid-cols-2 gap-2.5">
+                                <button @click="openRenameModal()"
+                                        class="p-3 rounded-2xl bg-white/5 hover:bg-brand-500/20 border border-white/10 hover:border-brand-500/40 text-left transition group relative">
+                                    <div class="flex items-center justify-between mb-0.5">
+                                        <div class="flex items-center gap-1.5 text-brand-400 font-bold text-xs">
+                                            <i data-lucide="edit-3" class="w-4 h-4"></i>
+                                            <span>Ubah Nama</span>
+                                        </div>
+                                        <kbd class="px-1 py-0.2 rounded bg-black/40 text-slate-400 font-mono text-[9px]">Y / F2</kbd>
+                                    </div>
+                                    <p class="text-[10px] text-slate-400 group-hover:text-slate-300">Ganti nama file foto</p>
+                                </button>
 
-                            <button @click="isAddToAlbumModalOpen = true"
-                                    class="p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-semibold flex items-center justify-center gap-1.5 transition">
-                                <i data-lucide="layers" class="w-3.5 h-3.5 text-purple-400"></i>
-                                <span>Masuk Album</span>
-                            </button>
+                                <button @click="openMoveModal()"
+                                        class="p-3 rounded-2xl bg-white/5 hover:bg-amber-500/20 border border-white/10 hover:border-amber-500/40 text-left transition group relative">
+                                    <div class="flex items-center justify-between mb-0.5">
+                                        <div class="flex items-center gap-1.5 text-amber-400 font-bold text-xs">
+                                            <i data-lucide="folder-input" class="w-4 h-4"></i>
+                                            <span>Pindah Folder</span>
+                                        </div>
+                                        <kbd class="px-1 py-0.2 rounded bg-black/40 text-slate-400 font-mono text-[9px]">M</kbd>
+                                    </div>
+                                    <p class="text-[10px] text-slate-400 group-hover:text-slate-300">Relokasi ke folder lain</p>
+                                </button>
 
-                            <button @click="trashActivePhoto()"
-                                    class="p-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 text-rose-400 text-xs font-semibold flex items-center justify-center gap-1.5 transition">
-                                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-                                <span>Hapus ke Trash</span>
-                            </button>
+                                <button @click="isAddToAlbumModalOpen = true"
+                                        class="p-3 rounded-2xl bg-white/5 hover:bg-purple-500/20 border border-white/10 hover:border-purple-500/40 text-left transition group relative">
+                                    <div class="flex items-center justify-between mb-0.5">
+                                        <div class="flex items-center gap-1.5 text-purple-400 font-bold text-xs">
+                                            <i data-lucide="layers" class="w-4 h-4"></i>
+                                            <span>Masuk Album</span>
+                                        </div>
+                                        <kbd class="px-1 py-0.2 rounded bg-black/40 text-slate-400 font-mono text-[9px]">A</kbd>
+                                    </div>
+                                    <p class="text-[10px] text-slate-400 group-hover:text-slate-300">Tambah ke album virtual</p>
+                                </button>
+
+                                <button @click="trashActivePhoto()"
+                                        class="p-3 rounded-2xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 hover:border-rose-500/40 text-left transition group relative">
+                                    <div class="flex items-center justify-between mb-0.5">
+                                        <div class="flex items-center gap-1.5 text-rose-400 font-bold text-xs">
+                                            <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                            <span>Hapus ke Trash</span>
+                                        </div>
+                                        <kbd class="px-1 py-0.2 rounded bg-black/40 text-rose-300 font-mono text-[9px]">Del</kbd>
+                                    </div>
+                                    <p class="text-[10px] text-rose-400/70 group-hover:text-rose-400">Pindahkan ke tong sampah</p>
+                                </button>
+                            </div>
                         </div>
 
-                        <div class="space-y-3 pt-3 border-t border-white/10 text-xs">
-                            <div>
-                                <span class="text-slate-400 block mb-0.5">Resolusi</span>
-                                <span class="font-mono font-medium text-white" x-text="(activePhoto.width && activePhoto.height) ? (activePhoto.width + ' × ' + activePhoto.height + ' px') : 'Tidak tersedia'"></span>
-                            </div>
-                            <div>
-                                <span class="text-slate-400 block mb-0.5">Ukuran File</span>
-                                <span class="font-medium text-white" x-text="formatSize(activePhoto.file_size)"></span>
-                            </div>
-                            <div>
-                                <span class="text-slate-400 block mb-0.5">Waktu Foto Diambil (EXIF)</span>
-                                <span class="font-medium text-white" x-text="activePhoto.date_taken ? formatDate(activePhoto.date_taken) : formatDate(activePhoto.date_created)"></span>
-                            </div>
-                            <div>
-                                <span class="text-slate-400 block mb-0.5">Lokasi File di PC</span>
-                                <span class="font-mono text-[10px] text-slate-300 break-all select-all block p-2 rounded-lg bg-white/5" x-text="photoDetail ? photoDetail.file_path : activePhoto.folder_path"></span>
+                        <div>
+                            <p class="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2.5">Spesifikasi & Metadata</p>
+                            <div class="space-y-2 text-xs">
+                                <div class="p-3 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between">
+                                    <div class="flex items-center gap-2.5">
+                                        <i data-lucide="maximize-2" class="w-4 h-4 text-slate-400"></i>
+                                        <span class="text-slate-400">Dimensi Resolusi</span>
+                                    </div>
+                                    <span class="font-mono font-bold text-white"
+                                          x-text="(activePhoto.width && activePhoto.height) ? (activePhoto.width + ' × ' + activePhoto.height + ' px') : 'Tidak tersedia'"></span>
+                                </div>
+
+                                <div class="p-3 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between">
+                                    <div class="flex items-center gap-2.5">
+                                        <i data-lucide="hard-drive" class="w-4 h-4 text-slate-400"></i>
+                                        <span class="text-slate-400">Ukuran File</span>
+                                    </div>
+                                    <span class="font-bold text-white" x-text="formatSize(activePhoto.file_size)"></span>
+                                </div>
+
+                                <div class="p-3 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between">
+                                    <div class="flex items-center gap-2.5">
+                                        <i data-lucide="calendar" class="w-4 h-4 text-slate-400"></i>
+                                        <span class="text-slate-400">Waktu Foto</span>
+                                    </div>
+                                    <span class="font-medium text-white" x-text="activePhoto.date_taken ? formatDate(activePhoto.date_taken) : formatDate(activePhoto.date_created)"></span>
+                                </div>
+
+                                <div class="p-3 rounded-2xl bg-white/5 border border-white/10 space-y-2">
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center gap-2.5">
+                                            <i data-lucide="folder" class="w-4 h-4 text-slate-400"></i>
+                                            <span class="text-slate-400">Lokasi File di PC</span>
+                                        </div>
+                                        <button @click="copyFilePath(photoDetail ? photoDetail.file_path : activePhoto.folder_path)"
+                                                class="px-2 py-0.5 rounded bg-white/10 hover:bg-white/20 text-[10px] font-bold text-brand-300 transition flex items-center gap-1">
+                                            <i data-lucide="copy" class="w-3 h-3"></i>
+                                            <span>Salin Path</span>
+                                        </button>
+                                    </div>
+                                    <p class="font-mono text-[10px] text-slate-300 break-all select-all bg-black/40 p-2 rounded-xl border border-white/5"
+                                       x-text="photoDetail ? photoDetail.file_path : activePhoto.folder_path"></p>
+                                </div>
                             </div>
                         </div>
                     </div>
 
                     <div class="pt-6 border-t border-white/10 space-y-2">
                         <a :href="getOrigUrl(activePhoto.id)" target="_blank" download
-                           class="w-full py-2.5 px-4 bg-brand-600 hover:bg-brand-500 text-white rounded-xl text-xs font-bold text-center block transition">
-                            Unduh File Foto Asli
+                           class="w-full py-3.5 px-4 bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white font-bold rounded-2xl text-xs sm:text-sm text-center shadow-lg shadow-brand-500/25 transition flex items-center justify-center gap-2">
+                            <i data-lucide="download" class="w-4 h-4"></i>
+                            <span>Unduh File Foto Asli</span>
                         </a>
                     </div>
                 </div>
             </div>
         </template>
+    </div>
+
+    <div x-show="isShortcutsModalOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md"
+         @click.self="isShortcutsModalOpen = false">
+        <div class="w-full max-w-lg bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800">
+            <div class="flex items-center justify-between mb-4 pb-3 border-b border-slate-100 dark:border-slate-800">
+                <div class="flex items-center gap-2.5">
+                    <div class="p-2 rounded-xl bg-brand-500/10 text-brand-500">
+                        <i data-lucide="keyboard" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-base text-slate-900 dark:text-white">Panduan Tombol & Pintasan Kontrol</h3>
+                        <p class="text-[11px] text-slate-400">Keyboard, Mouse, & Stick Controller Gamepad</p>
+                    </div>
+                </div>
+                <button @click="isShortcutsModalOpen = false" class="p-1 rounded-lg text-slate-400 hover:text-slate-600">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+            </div>
+
+            <div class="space-y-4 max-h-[70vh] overflow-y-auto pr-1 text-xs">
+                <div>
+                    <h4 class="font-bold uppercase tracking-wider text-slate-400 mb-2 text-[10px]">Pintasan Keyboard (PC / Laptop)</h4>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 flex items-center justify-between">
+                            <span class="text-slate-600 dark:text-slate-300">Ganti Foto</span>
+                            <kbd class="px-1.5 py-0.5 rounded bg-white dark:bg-slate-700 font-mono font-bold shadow text-[10px]">Panah Kiri / Kanan</kbd>
+                        </div>
+                        <div class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 flex items-center justify-between">
+                            <span class="text-slate-600 dark:text-slate-300">Zoom In / Out</span>
+                            <kbd class="px-1.5 py-0.5 rounded bg-white dark:bg-slate-700 font-mono font-bold shadow text-[10px]">+ / -</kbd>
+                        </div>
+                        <div class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 flex items-center justify-between">
+                            <span class="text-slate-600 dark:text-slate-300">Putar Foto 90°</span>
+                            <kbd class="px-1.5 py-0.5 rounded bg-white dark:bg-slate-700 font-mono font-bold shadow text-[10px]">R</kbd>
+                        </div>
+                        <div class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 flex items-center justify-between">
+                            <span class="text-slate-600 dark:text-slate-300">Reset Zoom</span>
+                            <kbd class="px-1.5 py-0.5 rounded bg-white dark:bg-slate-700 font-mono font-bold shadow text-[10px]">0</kbd>
+                        </div>
+                        <div class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 flex items-center justify-between">
+                            <span class="text-slate-600 dark:text-slate-300">Tandai Favorit</span>
+                            <kbd class="px-1.5 py-0.5 rounded bg-white dark:bg-slate-700 font-mono font-bold shadow text-[10px]">F</kbd>
+                        </div>
+                        <div class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 flex items-center justify-between">
+                            <span class="text-slate-600 dark:text-slate-300">Ubah Nama</span>
+                            <kbd class="px-1.5 py-0.5 rounded bg-white dark:bg-slate-700 font-mono font-bold shadow text-[10px]">Y / F2</kbd>
+                        </div>
+                        <div class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 flex items-center justify-between">
+                            <span class="text-slate-600 dark:text-slate-300">Pindah Folder</span>
+                            <kbd class="px-1.5 py-0.5 rounded bg-white dark:bg-slate-700 font-mono font-bold shadow text-[10px]">M</kbd>
+                        </div>
+                        <div class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 flex items-center justify-between">
+                            <span class="text-slate-600 dark:text-slate-300">Masuk Album</span>
+                            <kbd class="px-1.5 py-0.5 rounded bg-white dark:bg-slate-700 font-mono font-bold shadow text-[10px]">A</kbd>
+                        </div>
+                        <div class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 flex items-center justify-between">
+                            <span class="text-slate-600 dark:text-slate-300">Hapus ke Trash</span>
+                            <kbd class="px-1.5 py-0.5 rounded bg-white dark:bg-slate-700 font-mono font-bold shadow text-[10px]">Delete</kbd>
+                        </div>
+                        <div class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 flex items-center justify-between">
+                            <span class="text-slate-600 dark:text-slate-300">Tutup Layar</span>
+                            <kbd class="px-1.5 py-0.5 rounded bg-white dark:bg-slate-700 font-mono font-bold shadow text-[10px]">ESC</kbd>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="pt-2 border-t border-slate-100 dark:border-slate-800">
+                    <h4 class="font-bold uppercase tracking-wider text-slate-400 mb-2 text-[10px]">Kontrol Gamepad (Stick PS / Xbox / USB)</h4>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div class="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-between">
+                            <span class="font-medium text-slate-800 dark:text-slate-200">Geser & Pilih Foto</span>
+                            <kbd class="px-1.5 py-0.5 rounded bg-slate-800 text-white font-mono font-bold text-[10px]">D-Pad / Stick</kbd>
+                        </div>
+                        <div class="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-between">
+                            <span class="font-medium text-slate-800 dark:text-slate-200">Buka Layar Penuh</span>
+                            <kbd class="px-1.5 py-0.5 rounded bg-emerald-600 text-white font-mono font-bold text-[10px]">Tombol A / Cross</kbd>
+                        </div>
+                        <div class="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-between">
+                            <span class="font-medium text-slate-800 dark:text-slate-200">Tutup / Kembali</span>
+                            <kbd class="px-1.5 py-0.5 rounded bg-rose-600 text-white font-mono font-bold text-[10px]">Tombol B / Circle</kbd>
+                        </div>
+                        <div class="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-between">
+                            <span class="font-medium text-slate-800 dark:text-slate-200">Tandai Favorit</span>
+                            <kbd class="px-1.5 py-0.5 rounded bg-blue-600 text-white font-mono font-bold text-[10px]">Tombol X / Square</kbd>
+                        </div>
+                        <div class="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-between">
+                            <span class="font-medium text-slate-800 dark:text-slate-200">Ubah Nama (Rename)</span>
+                            <kbd class="px-1.5 py-0.5 rounded bg-amber-600 text-white font-mono font-bold text-[10px]">Tombol Y / Triangle</kbd>
+                        </div>
+                        <div class="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-between">
+                            <span class="font-medium text-slate-800 dark:text-slate-200">Pindah Halaman</span>
+                            <kbd class="px-1.5 py-0.5 rounded bg-slate-800 text-white font-mono font-bold text-[10px]">LB / RB</kbd>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-5 pt-3 border-t border-slate-100 dark:border-slate-800 flex justify-end">
+                <button @click="isShortcutsModalOpen = false" class="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-xs font-bold rounded-xl shadow transition">
+                    Mengerti
+                </button>
+            </div>
+        </div>
     </div>
 
     <div x-show="isRenameModalOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm"

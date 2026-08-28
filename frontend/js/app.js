@@ -13,6 +13,7 @@ document.addEventListener('alpine:init', () => {
         currentView: 'gallery',
         isDarkMode: false,
         isMobileMenuOpen: false,
+        isShortcutsModalOpen: false,
 
         photos: [],
         groupedPhotos: [],
@@ -42,6 +43,8 @@ document.addEventListener('alpine:init', () => {
         activePhotoIndex: -1,
         photoDetail: null,
         isLoadingDetail: false,
+        zoomLevel: 1,
+        rotationDeg: 0,
 
         isRenameModalOpen: false,
         renameInputName: '',
@@ -123,11 +126,38 @@ document.addEventListener('alpine:init', () => {
             });
 
             window.addEventListener('keydown', (e) => {
+                if (e.key === '?' && !this.isRenameModalOpen && !this.isAddFolderModalOpen && !this.isCreateAlbumModalOpen) {
+                    this.isShortcutsModalOpen = !this.isShortcutsModalOpen;
+                    return;
+                }
+
                 if (!this.isViewerOpen) return;
-                if (this.isRenameModalOpen || this.isMoveModalOpen || this.isAddToAlbumModalOpen) return;
+                if (this.isRenameModalOpen || this.isMoveModalOpen || this.isAddToAlbumModalOpen || this.isShortcutsModalOpen) return;
+
                 if (e.key === 'Escape') this.closeViewer();
                 if (e.key === 'ArrowRight') this.nextPhoto();
                 if (e.key === 'ArrowLeft') this.prevPhoto();
+                if (e.key === '+' || e.key === '=') this.zoomIn();
+                if (e.key === '-' || e.key === '_') this.zoomOut();
+                if (e.key === '0') this.resetZoom();
+                if (e.key === 'r' || e.key === 'R') this.rotatePhoto();
+                if (e.key === 'f' || e.key === 'F') this.toggleFavoriteActive();
+                if (e.key === 'y' || e.key === 'Y' || e.key === 'F2') {
+                    e.preventDefault();
+                    this.openRenameModal();
+                }
+                if (e.key === 'm' || e.key === 'M') {
+                    e.preventDefault();
+                    this.openMoveModal();
+                }
+                if (e.key === 'a' || e.key === 'A') {
+                    e.preventDefault();
+                    this.isAddToAlbumModalOpen = true;
+                }
+                if (e.key === 'Delete') {
+                    e.preventDefault();
+                    this.trashActivePhoto();
+                }
             });
         },
 
@@ -419,6 +449,8 @@ document.addEventListener('alpine:init', () => {
             this.activePhoto = photo;
             this.activePhotoIndex = index;
             this.isViewerOpen = true;
+            this.zoomLevel = 1;
+            this.rotationDeg = 0;
             this.loadPhotoDetail(photo.id);
             this.$nextTick(() => {
                 if (window.lucide) window.lucide.createIcons();
@@ -432,6 +464,39 @@ document.addEventListener('alpine:init', () => {
             this.isRenameModalOpen = false;
             this.isMoveModalOpen = false;
             this.isAddToAlbumModalOpen = false;
+            this.isShortcutsModalOpen = false;
+            this.zoomLevel = 1;
+            this.rotationDeg = 0;
+        },
+
+        zoomIn() {
+            if (this.zoomLevel < 3) {
+                this.zoomLevel = +(this.zoomLevel + 0.25).toFixed(2);
+            }
+        },
+
+        zoomOut() {
+            if (this.zoomLevel > 0.5) {
+                this.zoomLevel = +(this.zoomLevel - 0.25).toFixed(2);
+            }
+        },
+
+        resetZoom() {
+            this.zoomLevel = 1;
+            this.rotationDeg = 0;
+        },
+
+        rotatePhoto() {
+            this.rotationDeg = (this.rotationDeg + 90) % 360;
+        },
+
+        copyFilePath(path) {
+            if (!path) return;
+            navigator.clipboard.writeText(path).then(() => {
+                this.showToast('Path file berhasil disalin ke clipboard!', 'success');
+            }).catch(() => {
+                this.showToast('Gagal menyalin path.', 'error');
+            });
         },
 
         async loadPhotoDetail(photoId) {
@@ -449,6 +514,8 @@ document.addEventListener('alpine:init', () => {
             if (this.activePhotoIndex < this.photos.length - 1) {
                 this.activePhotoIndex++;
                 this.activePhoto = this.photos[this.activePhotoIndex];
+                this.zoomLevel = 1;
+                this.rotationDeg = 0;
                 this.loadPhotoDetail(this.activePhoto.id);
             }
         },
@@ -457,6 +524,8 @@ document.addEventListener('alpine:init', () => {
             if (this.activePhotoIndex > 0) {
                 this.activePhotoIndex--;
                 this.activePhoto = this.photos[this.activePhotoIndex];
+                this.zoomLevel = 1;
+                this.rotationDeg = 0;
                 this.loadPhotoDetail(this.activePhoto.id);
             }
         },
@@ -805,6 +874,10 @@ document.addEventListener('alpine:init', () => {
 
         formatDate(dateStr) {
             return GalleryUtils.formatDateTime(dateStr);
+        },
+
+        formatRatio(width, height) {
+            return GalleryUtils.getAspectRatio(width, height);
         },
 
         getThumbUrl(photoId) {
