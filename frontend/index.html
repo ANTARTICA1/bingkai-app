@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="id" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bingkai - Local Photo Manager & Remote Controller</title>
+    <meta name="description" content="Membantu yang berserakan kembali beraturan - Kelola ribuan foto lokal komputer dengan cepat, aman, dan dapat diakses dari smartphone.">
+    <link rel="icon" type="image/svg+xml" href="/assets/logo.svg">
+
+    <link rel="stylesheet" href="/css/style.css">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#eef2ff',
+                            100: '#e0e7ff',
+                            200: '#c7d2fe',
+                            300: '#a5b4fc',
+                            400: '#818cf8',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                            800: '#3730a3',
+                            900: '#312e81',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/lucide@0.475.0/dist/umd/lucide.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"></script>
+
+    <script src="/js/api.js"></script>
+    <script src="/js/gallery.js"></script>
+    <script src="/js/app.js"></script>
+</head>
+<body class="h-full bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 flex flex-col antialiased selection:bg-brand-500 selection:text-white" x-data="bingkaiApp" x-cloak>
+
+    <noscript>
+        <div class="p-4 bg-amber-500 text-white font-medium text-center">
+            Aplikasi Bingkai memerlukan JavaScript untuk menjalankan manajemen foto lokal. Silakan aktifkan JavaScript di browser Anda.
+        </div>
+    </noscript>
+
+    <div class="fixed bottom-16 sm:bottom-6 right-4 sm:right-6 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none">
+        <template x-for="toast in toasts" :key="toast.id">
+            <div class="pointer-events-auto flex items-center justify-between p-4 rounded-xl shadow-xl transition transform duration-300 ease-out text-sm font-medium"
+                 :class="{
+                    'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900': toast.type === 'info',
+                    'bg-emerald-600 text-white': toast.type === 'success',
+                    'bg-rose-600 text-white': toast.type === 'error'
+                 }">
+                <div class="flex items-center gap-3">
+                    <span x-show="toast.type === 'success'">✓</span>
+                    <span x-show="toast.type === 'error'">✕</span>
+                    <span x-show="toast.type === 'info'">ℹ</span>
+                    <span x-text="toast.message"></span>
+                </div>
+            </div>
+        </template>
+    </div>
+
+    <template x-if="!isAuthenticated && !isAuthChecking">
+        <div class="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-slate-900 via-slate-950 to-indigo-950">
+            <div class="w-full max-w-md glass-panel p-8 rounded-3xl shadow-2xl border border-white/10 relative overflow-hidden backdrop-blur-2xl">
+                <div class="absolute -top-20 -left-20 w-48 h-48 bg-brand-500/20 rounded-full blur-3xl pointer-events-none"></div>
+                <div class="absolute -bottom-20 -right-20 w-48 h-48 bg-pink-500/20 rounded-full blur-3xl pointer-events-none"></div>
+
+                <div class="text-center mb-8 relative">
+                    <div class="w-16 h-16 mx-auto mb-4 p-3 bg-white/10 dark:bg-slate-800/60 rounded-2xl shadow-inner border border-white/20 flex items-center justify-center">
+                        <img src="/assets/logo.svg" alt="Bingkai Logo" class="w-full h-full">
+                    </div>
+                    <h1 class="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-blue-400 to-indigo-300 bg-clip-text text-transparent">
+                        Bingkai
+                    </h1>
+                    <p class="text-xs uppercase tracking-widest text-slate-400 mt-1 font-semibold">
+                        Local Photo Manager & Remote Controller
+                    </p>
+                    <p class="text-sm italic text-slate-400 mt-2">
+                        "Membantu yang berserakan kembali beraturan"
+                    </p>
+                </div>
+
+                <div x-show="loginError" x-text="loginError" class="mb-4 p-3 rounded-xl bg-rose-500/20 border border-rose-500/30 text-rose-300 text-sm text-center"></div>
+
+                <form @submit.prevent="login()" class="space-y-4 relative">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1.5 uppercase tracking-wider">Username</label>
+                        <input type="text" x-model="loginForm.username" required
+                               class="w-full px-4 py-3 bg-slate-900/60 border border-white/10 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent transition"
+                               placeholder="admin">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1.5 uppercase tracking-wider">Password</label>
+                        <input type="password" x-model="loginForm.password" required
+                               class="w-full px-4 py-3 bg-slate-900/60 border border-white/10 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent transition"
+                               placeholder="••••••••">
+                    </div>
+
+                    <button type="submit" :disabled="loginLoading"
+                            class="w-full py-3.5 px-4 bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white font-semibold rounded-xl shadow-lg shadow-brand-500/25 transition duration-200 transform active:scale-98 flex items-center justify-center gap-2">
+                        <span x-show="!loginLoading">Masuk ke Bingkai</span>
+                        <span x-show="loginLoading" class="animate-pulse">Memproses...</span>
+                    </button>
+                </form>
+
+                <div class="mt-6 text-center text-xs text-slate-500">
+                    Akun lokal default: <code class="text-brand-300 bg-white/5 px-1.5 py-0.5 rounded">admin / admin123</code>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <template x-if="isAuthenticated">
+        <div class="flex-1 flex overflow-hidden">
+
+            <aside class="hidden md:flex flex-col w-64 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex-shrink-0 select-none">
+                <div class="p-5 border-b border-slate-200 dark:border-slate-800 flex items-center gap-3">
+                    <img src="/assets/logo.svg" alt="Bingkai" class="w-9 h-9">
+                    <div>
+                        <h1 class="font-bold text-lg leading-tight tracking-tight text-slate-900 dark:text-white">Bingkai</h1>
+                        <p class="text-[10px] text-slate-400 uppercase tracking-widest font-medium">Local Photos</p>
+                    </div>
+                </div>
+
+                <nav class="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+                    <button @click="switchView('gallery')"
+                            class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition"
+                            :class="currentView === 'gallery' && !selectedFolderId ? 'bg-brand-50 dark:bg-brand-900/30 text-brand-600 dark:text-brand-400 font-semibold' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'">
+                        <i data-lucide="image" class="w-4 h-4"></i>
+                        <span>Semua Foto</span>
+                    </button>
+
+                    <button @click="switchView('favorites')"
+                            class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition"
+                            :class="currentView === 'favorites' ? 'bg-brand-50 dark:bg-brand-900/30 text-brand-600 dark:text-brand-400 font-semibold' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'">
+                        <i data-lucide="heart" class="w-4 h-4 text-rose-500"></i>
+                        <span>Favorit</span>
+                    </button>
+
+                    <button @click="switchView('folders')"
+                            class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition"
+                            :class="currentView === 'folders' ? 'bg-brand-50 dark:bg-brand-900/30 text-brand-600 dark:text-brand-400 font-semibold' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'">
+                        <i data-lucide="folder" class="w-4 h-4 text-amber-500"></i>
+                        <span>Folder Lokal</span>
+                    </button>
+
+                    <button @click="switchView('dashboard')"
+                            class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition"
+                            :class="currentView === 'dashboard' ? 'bg-brand-50 dark:bg-brand-900/30 text-brand-600 dark:text-brand-400 font-semibold' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'">
+                        <i data-lucide="pie-chart" class="w-4 h-4 text-indigo-500"></i>
+                        <span>Dashboard Storage</span>
+                    </button>
+
+                    <button @click="switchView('settings')"
+                            class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition"
+                            :class="currentView === 'settings' ? 'bg-brand-50 dark:bg-brand-900/30 text-brand-600 dark:text-brand-400 font-semibold' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'">
+                        <i data-lucide="smartphone" class="w-4 h-4 text-emerald-500"></i>
+                        <span>Remote HP & Setelan</span>
+                    </button>
+
+                    <div class="pt-5 pb-2">
+                        <div class="flex items-center justify-between px-3 mb-2">
+                            <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Folder Terdaftar</span>
+                            <button @click="isAddFolderModalOpen = true" title="Tambah Folder Baru"
+                                    class="text-xs text-brand-600 dark:text-brand-400 hover:underline flex items-center gap-1">
+                                <span>+ Tambah</span>
+                            </button>
+                        </div>
+
+                        <div class="space-y-0.5">
+                            <template x-for="f in folders" :key="f.id">
+                                <button @click="filterByFolder(f.id)"
+                                        class="w-full text-left flex items-center justify-between px-3 py-2 rounded-lg text-xs transition"
+                                        :class="selectedFolderId === f.id ? 'bg-slate-200 dark:bg-slate-800 text-brand-600 dark:text-brand-400 font-bold' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/50'">
+                                    <div class="truncate flex items-center gap-2">
+                                        <i data-lucide="folder-open" class="w-3.5 h-3.5 flex-shrink-0 text-amber-500"></i>
+                                        <span class="truncate" x-text="f.name"></span>
+                                    </div>
+                                    <span class="text-[10px] px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 rounded-full font-semibold" x-text="f.photo_count"></span>
+                                </button>
+                            </template>
+                            <div x-show="folders.length === 0" class="px-3 py-2 text-xs text-slate-400 italic">
+                                Belum ada folder dipantau
+                            </div>
+                        </div>
+                    </div>
+                </nav>
+
+                <div class="p-3 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between">
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-8 h-8 rounded-full bg-brand-500/20 text-brand-600 dark:text-brand-400 flex items-center justify-center font-bold text-xs">
+                            <span x-text="currentUser ? currentUser.username[0].toUpperCase() : 'U'"></span>
+                        </div>
+                        <div class="truncate">
+                            <p class="text-xs font-semibold truncate text-slate-800 dark:text-slate-200" x-text="currentUser ? currentUser.username : 'User'"></p>
+                            <p class="text-[10px] text-emerald-500 font-medium">Local Online</p>
+                        </div>
+                    </div>
+                    <button @click="logout()" title="Logout"
+                            class="p-2 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition">
+                        <i data-lucide="log-out" class="w-4 h-4"></i>
+                    </button>
+                </div>
+            </aside>
+
+            <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+
+                <header class="h-16 border-b border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md px-4 sm:px-6 flex items-center justify-between gap-4 z-10 flex-shrink-0">
+                    <div class="flex-1 max-w-md relative">
+                        <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                            <i data-lucide="search" class="w-4 h-4"></i>
+                        </div>
+                        <input type="text" x-model="searchQuery" @input="onSearchInput()"
+                               placeholder="Cari foto, folder, .jpg, .png..."
+                               class="w-full pl-10 pr-4 py-2 bg-slate-100 dark:bg-slate-800 border-none rounded-xl text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500 text-slate-800 dark:text-slate-200 transition">
+                    </div>
+
+                    <div class="flex items-center gap-2 sm:gap-3">
+                        <div x-show="currentView === 'gallery' || currentView === 'favorites'" class="relative">
+                            <select x-model="sortBy" @change="onSortChange()"
+                                    class="bg-slate-100 dark:bg-slate-800 text-xs sm:text-sm font-medium py-2 px-3 rounded-xl border-none focus:ring-2 focus:ring-brand-500 text-slate-700 dark:text-slate-300">
+                                <option value="date_desc">Terbaru</option>
+                                <option value="date_asc">Terlama</option>
+                                <option value="name_asc">Nama A-Z</option>
+                                <option value="name_desc">Nama Z-A</option>
+                                <option value="size_desc">Ukuran Terbesar</option>
+                                <option value="size_asc">Ukuran Terkecil</option>
+                            </select>
+                        </div>
+
+                        <button @click="isAddFolderModalOpen = true"
+                                class="hidden sm:flex items-center gap-1.5 px-3.5 py-2 bg-brand-600 hover:bg-brand-500 text-white rounded-xl text-xs sm:text-sm font-semibold shadow-sm transition">
+                            <i data-lucide="folder-plus" class="w-4 h-4"></i>
+                            <span>Tambah Folder</span>
+                        </button>
+
+                        <button @click="toggleDarkMode()" title="Ganti Tema"
+                                class="p-2 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition">
+                            <i data-lucide="moon" x-show="!isDarkMode" class="w-4 h-4"></i>
+                            <i data-lucide="sun" x-show="isDarkMode" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                </header>
+
+                <main class="flex-1 overflow-y-auto p-4 sm:p-6 pb-20 sm:pb-6">
+
+                    <div x-show="currentView === 'gallery' || currentView === 'favorites'">
+                        <div class="flex items-center justify-between mb-6">
+                            <div>
+                                <h2 class="text-xl sm:text-2xl font-extrabold tracking-tight flex items-center gap-2">
+                                    <span x-text="currentView === 'favorites' ? 'Foto Favorit' : (selectedFolderId ? 'Folder Terpilih' : 'Semua Foto')"></span>
+                                    <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-brand-100 dark:bg-brand-900/40 text-brand-700 dark:text-brand-300"
+                                          x-text="totalPhotos + ' Foto'"></span>
+                                </h2>
+                                <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5" x-show="selectedFolderId">
+                                    Menampilkan foto dari folder yang dipilih
+                                    <button @click="filterByFolder(null)" class="text-brand-500 font-semibold underline ml-1">Tampilkan Semua</button>
+                                </p>
+                            </div>
+
+                            <button @click="loadPhotos(page)" title="Segarkan Data"
+                                    class="p-2 rounded-xl text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-800 transition">
+                                <i data-lucide="refresh-cw" class="w-4 h-4" :class="isLoadingPhotos ? 'animate-spin' : ''"></i>
+                            </button>
+                        </div>
+
+                        <div x-show="!isLoadingPhotos && photos.length === 0" class="py-16 text-center">
+                            <div class="w-16 h-16 mx-auto mb-4 p-4 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center">
+                                <i data-lucide="image-off" class="w-8 h-8"></i>
+                            </div>
+                            <h3 class="font-bold text-lg text-slate-700 dark:text-slate-300">Belum Ada Foto</h3>
+                            <p class="text-sm text-slate-400 max-w-sm mx-auto mt-1 mb-6">
+                                Tambahkan folder lokal dari komputer Anda (seperti D:/Photos atau Pictures) untuk mulai mengindeks foto.
+                            </p>
+                            <button @click="isAddFolderModalOpen = true"
+                                    class="px-5 py-2.5 bg-brand-600 hover:bg-brand-500 text-white font-semibold text-sm rounded-xl shadow transition">
+                                Tambah Folder Sekarang
+                            </button>
+                        </div>
+
+                        <template x-for="group in groupedPhotos" :key="group.title">
+                            <div class="mb-8">
+                                <h3 class="text-sm font-bold tracking-tight uppercase text-slate-500 dark:text-slate-400 mb-3 flex items-center gap-2">
+                                    <i data-lucide="calendar" class="w-4 h-4 text-brand-500"></i>
+                                    <span x-text="group.title"></span>
+                                    <span class="text-xs font-normal text-slate-400 lowercase" x-text="'(' + group.items.length + ' item)'"></span>
+                                </h3>
+
+                                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
+                                    <template x-for="(photo, idx) in group.items" :key="photo.id">
+                                        <div @click="openViewer(photo, photos.findIndex(p => p.id === photo.id))"
+                                             class="group photo-card relative aspect-square bg-slate-200 dark:bg-slate-800 rounded-2xl overflow-hidden cursor-pointer shadow-sm hover:shadow-md border border-slate-200/50 dark:border-slate-800">
+                                            <img :src="getThumbUrl(photo.id)" :alt="photo.filename" loading="lazy"
+                                                 class="w-full h-full object-cover group-hover:scale-105 transition duration-300 ease-out">
+
+                                            <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity p-2.5 flex flex-col justify-between">
+                                                <div class="self-end">
+                                                    <span x-show="photo.favorite" class="text-rose-500 text-base drop-shadow">❤️</span>
+                                                </div>
+                                                <div class="text-white text-[11px] truncate">
+                                                    <p class="font-medium truncate" x-text="photo.filename"></p>
+                                                    <p class="text-[9px] text-slate-300" x-text="formatSize(photo.file_size)"></p>
+                                                </div>
+                                            </div>
+
+                                            <div x-show="photo.favorite" class="absolute top-2 right-2 group-hover:hidden">
+                                                <span class="text-rose-500 text-xs drop-shadow">❤️</span>
+                                            </div>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                        </template>
+
+                        <div x-show="totalPages > 1" class="mt-8 pt-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between">
+                            <button @click="loadPhotos(page - 1)" :disabled="!hasPrevPage"
+                                    class="px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-slate-700 transition">
+                                ← Sebelumnya
+                            </button>
+                            <span class="text-xs sm:text-sm font-medium text-slate-500 dark:text-slate-400"
+                                  x-text="'Halaman ' + page + ' dari ' + totalPages"></span>
+                            <button @click="loadPhotos(page + 1)" :disabled="!hasNextPage"
+                                    class="px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-slate-700 transition">
+                                Selanjutnya →
+                            </button>
+                        </div>
+                    </div>
+
+                    <div x-show="currentView === 'folders'" class="max-w-4xl mx-auto">
+                        <div class="flex items-center justify-between mb-6">
+                            <div>
+                                <h2 class="text-2xl font-extrabold tracking-tight">Manajemen Folder Lokal</h2>
+                                <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                                    Daftar direktori komputer yang dipantau dan diindeks oleh Bingkai.
+                                </p>
+                            </div>
+                            <button @click="isAddFolderModalOpen = true"
+                                    class="px-4 py-2.5 bg-brand-600 hover:bg-brand-500 text-white font-semibold text-sm rounded-xl shadow flex items-center gap-2">
+                                <i data-lucide="plus" class="w-4 h-4"></i>
+                                <span>Tambah Folder</span>
+                            </button>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <template x-for="folder in folders" :key="folder.id">
+                                <div class="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between">
+                                    <div>
+                                        <div class="flex items-start justify-between gap-2">
+                                            <div class="flex items-center gap-2.5">
+                                                <div class="p-2.5 rounded-xl bg-amber-500/10 text-amber-500">
+                                                    <i data-lucide="folder" class="w-5 h-5"></i>
+                                                </div>
+                                                <div>
+                                                    <h3 class="font-bold text-base text-slate-900 dark:text-white" x-text="folder.name"></h3>
+                                                    <span class="text-xs font-semibold text-brand-600 dark:text-brand-400" x-text="folder.photo_count + ' Foto Terindeks'"></span>
+                                                </div>
+                                            </div>
+                                            <button @click="deleteFolder(folder)" title="Hapus dari monitoring"
+                                                    class="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg transition">
+                                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                            </button>
+                                        </div>
+
+                                        <div class="mt-4 p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800/60 font-mono text-[11px] text-slate-600 dark:text-slate-300 break-all select-all">
+                                            <span x-text="folder.path"></span>
+                                        </div>
+
+                                        <div class="mt-3 text-[11px] text-slate-400 flex items-center gap-1">
+                                            <i data-lucide="clock" class="w-3 h-3"></i>
+                                            <span>Terakhir discan: </span>
+                                            <span class="font-medium text-slate-500 dark:text-slate-300" x-text="folder.last_scanned ? formatDate(folder.last_scanned) : 'Belum pernah'"></span>
+                                        </div>
+                                    </div>
+
+                                    <div class="mt-5 pt-3 border-t border-slate-100 dark:border-slate-800 flex gap-2">
+                                        <button @click="triggerFolderScan(folder.id)" :disabled="isScanningFolder && activeScanningId === folder.id"
+                                                class="flex-1 py-2 px-3 rounded-xl bg-brand-50 dark:bg-brand-900/30 hover:bg-brand-100 dark:hover:bg-brand-900/50 text-brand-600 dark:text-brand-400 text-xs font-bold transition flex items-center justify-center gap-1.5">
+                                            <i data-lucide="scan" class="w-3.5 h-3.5" :class="isScanningFolder && activeScanningId === folder.id ? 'animate-spin' : ''"></i>
+                                            <span x-text="isScanningFolder && activeScanningId === folder.id ? 'Memindai...' : 'Scan Ulang'"></span>
+                                        </button>
+
+                                        <button @click="filterByFolder(folder.id)"
+                                                class="py-2 px-4 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold transition">
+                                            Buka Galeri
+                                        </button>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+
+                    <div x-show="currentView === 'dashboard'" class="max-w-4xl mx-auto">
+                        <div class="mb-6">
+                            <h2 class="text-2xl font-extrabold tracking-tight">Dashboard Storage</h2>
+                            <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Ringkasan statistik penyimpanan foto lokal di komputer Anda.</p>
+                        </div>
+
+                        <template x-if="dashboardStats">
+                            <div class="space-y-6">
+                                <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                                    <div class="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                                        <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Foto</p>
+                                        <h3 class="text-2xl font-black text-slate-900 dark:text-white mt-1" x-text="dashboardStats.total_photos.toLocaleString()"></h3>
+                                    </div>
+                                    <div class="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                                        <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Ukuran</p>
+                                        <h3 class="text-2xl font-black text-brand-600 dark:text-brand-400 mt-1" x-text="dashboardStats.total_storage_formatted"></h3>
+                                    </div>
+                                    <div class="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                                        <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Foto Favorit</p>
+                                        <h3 class="text-2xl font-black text-rose-500 mt-1" x-text="dashboardStats.total_favorites.toLocaleString()"></h3>
+                                    </div>
+                                    <div class="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                                        <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Folder Dipantau</p>
+                                        <h3 class="text-2xl font-black text-amber-500 mt-1" x-text="dashboardStats.total_folders"></h3>
+                                    </div>
+                                </div>
+
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div class="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                                        <h4 class="font-bold text-sm text-slate-800 dark:text-slate-200 mb-4">Distribusi Format Gambar</h4>
+                                        <div class="flex flex-wrap gap-2">
+                                            <template x-for="(count, ext) in dashboardStats.format_counts" :key="ext">
+                                                <div class="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs">
+                                                    <span class="font-bold text-brand-600 dark:text-brand-400" x-text="'.' + ext.toLowerCase()"></span>
+                                                    <span class="font-semibold text-slate-700 dark:text-slate-300" x-text="count + ' file'"></span>
+                                                </div>
+                                            </template>
+                                        </div>
+                                    </div>
+
+                                    <div class="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                                        <h4 class="font-bold text-sm text-slate-800 dark:text-slate-200 mb-4">Folder Terbesar</h4>
+                                        <div class="space-y-3">
+                                            <template x-for="f in dashboardStats.largest_folders" :key="f.id">
+                                                <div class="flex items-center justify-between text-xs p-2 rounded-lg bg-slate-50 dark:bg-slate-800/40">
+                                                    <div class="truncate mr-2">
+                                                        <p class="font-bold text-slate-800 dark:text-slate-200 truncate" x-text="f.name"></p>
+                                                        <p class="text-[10px] text-slate-400 truncate" x-text="f.path"></p>
+                                                    </div>
+                                                    <div class="text-right flex-shrink-0">
+                                                        <p class="font-bold text-brand-600 dark:text-brand-400" x-text="f.size_formatted"></p>
+                                                        <p class="text-[10px] text-slate-400" x-text="f.photo_count + ' foto'"></p>
+                                                    </div>
+                                                </div>
+                                            </template>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+
+                    <div x-show="currentView === 'settings'" class="max-w-3xl mx-auto space-y-6">
+                        <div class="mb-6">
+                            <h2 class="text-2xl font-extrabold tracking-tight">Akses Remote HP & Setelan</h2>
+                            <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Buka galeri dan kontrol foto dari smartphone Anda melalui jaringan Wi-Fi lokal.</p>
+                        </div>
+
+                        <div class="p-6 rounded-3xl bg-gradient-to-br from-indigo-900/30 to-brand-900/30 border border-brand-500/30 backdrop-blur-xl">
+                            <div class="flex items-start gap-4">
+                                <div class="p-3 rounded-2xl bg-brand-500 text-white shadow-lg shadow-brand-500/30">
+                                    <i data-lucide="smartphone" class="w-6 h-6"></i>
+                                </div>
+                                <div class="flex-1">
+                                    <h3 class="text-lg font-bold text-slate-900 dark:text-white">Akses dari Smartphone (Remote Controller)</h3>
+                                    <p class="text-xs text-slate-600 dark:text-slate-300 mt-1 leading-relaxed">
+                                        Pastikan smartphone Anda terhubung ke <strong>jaringan Wi-Fi yang sama</strong> dengan PC ini. Buka browser HP dan ketikkan alamat berikut:
+                                    </p>
+
+                                    <div class="mt-4 space-y-2">
+                                        <template x-if="systemInfo">
+                                            <template x-for="url in systemInfo.remote_urls" :key="url">
+                                                <div class="flex items-center justify-between p-3 rounded-xl bg-white dark:bg-slate-900 border border-brand-500/20 font-mono text-sm font-bold text-brand-600 dark:text-brand-400 select-all">
+                                                    <span x-text="url"></span>
+                                                    <span class="text-[10px] uppercase font-sans font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500">Aktif</span>
+                                                </div>
+                                            </template>
+                                        </template>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4">
+                            <h4 class="font-bold text-sm text-slate-800 dark:text-slate-200 uppercase tracking-wider">Informasi Sistem</h4>
+                            <div class="divide-y divide-slate-100 dark:divide-slate-800 text-xs">
+                                <div class="py-2.5 flex justify-between">
+                                    <span class="text-slate-400">Versi Aplikasi</span>
+                                    <span class="font-semibold" x-text="systemInfo ? systemInfo.version : '0.1.0'"></span>
+                                </div>
+                                <div class="py-2.5 flex justify-between">
+                                    <span class="text-slate-400">Database Engine</span>
+                                    <span class="font-semibold">SQLite (WAL mode + Foreign Keys)</span>
+                                </div>
+                                <div class="py-2.5 flex justify-between">
+                                    <span class="text-slate-400">Frontend Stack</span>
+                                    <span class="font-semibold">Alpine.js v3.14.8 + Tailwind CSS CDN</span>
+                                </div>
+                                <div class="py-2.5 flex justify-between">
+                                    <span class="text-slate-400">Prinsip Privasi</span>
+                                    <span class="font-semibold text-emerald-500">100% Local-First (No Cloud Upload)</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </main>
+            </div>
+        </div>
+
+        <nav class="md:hidden fixed bottom-0 inset-x-0 h-14 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 flex items-center justify-around z-20">
+            <button @click="switchView('gallery')" class="flex flex-col items-center gap-0.5 text-[10px]"
+                    :class="currentView === 'gallery' ? 'text-brand-600 dark:text-brand-400 font-bold' : 'text-slate-400'">
+                <i data-lucide="image" class="w-5 h-5"></i>
+                <span>Foto</span>
+            </button>
+            <button @click="switchView('favorites')" class="flex flex-col items-center gap-0.5 text-[10px]"
+                    :class="currentView === 'favorites' ? 'text-brand-600 dark:text-brand-400 font-bold' : 'text-slate-400'">
+                <i data-lucide="heart" class="w-5 h-5"></i>
+                <span>Favorit</span>
+            </button>
+            <button @click="switchView('folders')" class="flex flex-col items-center gap-0.5 text-[10px]"
+                    :class="currentView === 'folders' ? 'text-brand-600 dark:text-brand-400 font-bold' : 'text-slate-400'">
+                <i data-lucide="folder" class="w-5 h-5"></i>
+                <span>Folder</span>
+            </button>
+            <button @click="switchView('dashboard')" class="flex flex-col items-center gap-0.5 text-[10px]"
+                    :class="currentView === 'dashboard' ? 'text-brand-600 dark:text-brand-400 font-bold' : 'text-slate-400'">
+                <i data-lucide="pie-chart" class="w-5 h-5"></i>
+                <span>Storage</span>
+            </button>
+            <button @click="switchView('settings')" class="flex flex-col items-center gap-0.5 text-[10px]"
+                    :class="currentView === 'settings' ? 'text-brand-600 dark:text-brand-400 font-bold' : 'text-slate-400'">
+                <i data-lucide="smartphone" class="w-5 h-5"></i>
+                <span>Remote</span>
+            </button>
+        </nav>
+    </template>
+
+    <div x-show="isAddFolderModalOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm"
+         @click.self="isAddFolderModalOpen = false">
+        <div class="w-full max-w-md bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="font-bold text-lg text-slate-900 dark:text-white flex items-center gap-2">
+                    <i data-lucide="folder-plus" class="w-5 h-5 text-brand-500"></i>
+                    <span>Tambah Folder Monitoring</span>
+                </h3>
+                <button @click="isAddFolderModalOpen = false" class="text-slate-400 hover:text-slate-600">✕</button>
+            </div>
+
+            <form @submit.prevent="submitNewFolder()" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Path Folder Komputer</label>
+                    <input type="text" x-model="newFolderPath" required
+                           placeholder="Contoh: D:\Photos atau C:\Users\User\Pictures"
+                           class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-mono focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                    <p class="text-[11px] text-slate-400 mt-1">Masukkan direktori absolut folder foto yang ada di laptop/PC Anda.</p>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Label / Nama Custom (Opsional)</label>
+                    <input type="text" x-model="newFolderName"
+                           placeholder="Contoh: Foto Liburan Bali"
+                           class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none">
+                </div>
+
+                <div class="flex gap-3 pt-2">
+                    <button type="button" @click="isAddFolderModalOpen = false"
+                            class="flex-1 py-2.5 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-sm font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 transition">
+                        Batal
+                    </button>
+                    <button type="submit" :disabled="isSubmittingFolder"
+                            class="flex-1 py-2.5 px-4 bg-brand-600 hover:bg-brand-500 text-white text-sm font-semibold rounded-xl shadow transition flex items-center justify-center gap-1.5">
+                        <span x-show="!isSubmittingFolder">Simpan & Scan</span>
+                        <span x-show="isSubmittingFolder" class="animate-pulse">Menyimpan...</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div x-show="isViewerOpen" class="fixed inset-0 z-50 flex bg-black/95 backdrop-blur-md"
+         @click.self="closeViewer()">
+        <template x-if="activePhoto">
+            <div class="flex-1 flex flex-col md:flex-row h-full overflow-hidden">
+                <div class="flex-1 relative flex items-center justify-center p-4 min-w-0 select-none">
+                    <button @click="closeViewer()"
+                            class="absolute top-4 left-4 z-20 p-2.5 rounded-full bg-white/10 hover:bg-white/20 text-white backdrop-blur-md transition">
+                        <i data-lucide="x" class="w-5 h-5"></i>
+                    </button>
+
+                    <button @click="prevPhoto()" :disabled="activePhotoIndex <= 0"
+                            class="absolute left-4 z-20 p-3 rounded-full bg-white/10 hover:bg-white/20 text-white backdrop-blur-md disabled:opacity-20 transition">
+                        <i data-lucide="chevron-left" class="w-6 h-6"></i>
+                    </button>
+                    <button @click="nextPhoto()" :disabled="activePhotoIndex >= photos.length - 1"
+                            class="absolute right-4 z-20 p-3 rounded-full bg-white/10 hover:bg-white/20 text-white backdrop-blur-md disabled:opacity-20 transition">
+                        <i data-lucide="chevron-right" class="w-6 h-6"></i>
+                    </button>
+
+                    <img :src="getOrigUrl(activePhoto.id)" :alt="activePhoto.filename"
+                         class="max-h-full max-w-full object-contain rounded-lg shadow-2xl transition-transform duration-200">
+                </div>
+
+                <div class="w-full md:w-80 bg-slate-900 border-t md:border-t-0 md:border-l border-white/10 p-6 flex flex-col justify-between overflow-y-auto text-slate-200">
+                    <div class="space-y-4">
+                        <div class="flex items-start justify-between gap-2">
+                            <div class="truncate">
+                                <h3 class="font-bold text-base text-white truncate" x-text="activePhoto.filename"></h3>
+                                <p class="text-xs text-slate-400 uppercase tracking-wider mt-0.5" x-text="activePhoto.extension.replace('.', '') + ' FILE'"></p>
+                            </div>
+                            <button @click="toggleFavoriteActive()"
+                                    class="p-2 rounded-xl border border-white/10 hover:bg-white/10 transition"
+                                    :class="activePhoto.favorite ? 'text-rose-500' : 'text-slate-400'">
+                                <i data-lucide="heart" class="w-5 h-5" :class="activePhoto.favorite ? 'fill-current' : ''"></i>
+                            </button>
+                        </div>
+
+                        <div class="space-y-3 pt-3 border-t border-white/10 text-xs">
+                            <div>
+                                <span class="text-slate-400 block mb-0.5">Resolusi</span>
+                                <span class="font-mono font-medium text-white" x-text="(activePhoto.width && activePhoto.height) ? (activePhoto.width + ' × ' + activePhoto.height + ' px') : 'Tidak tersedia'"></span>
+                            </div>
+                            <div>
+                                <span class="text-slate-400 block mb-0.5">Ukuran File</span>
+                                <span class="font-medium text-white" x-text="formatSize(activePhoto.file_size)"></span>
+                            </div>
+                            <div>
+                                <span class="text-slate-400 block mb-0.5">Waktu Foto Diambil (EXIF)</span>
+                                <span class="font-medium text-white" x-text="activePhoto.date_taken ? formatDate(activePhoto.date_taken) : formatDate(activePhoto.date_created)"></span>
+                            </div>
+                            <div>
+                                <span class="text-slate-400 block mb-0.5">Lokasi File di PC</span>
+                                <span class="font-mono text-[10px] text-slate-300 break-all select-all block p-2 rounded-lg bg-white/5" x-text="photoDetail ? photoDetail.file_path : activePhoto.folder_path"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="pt-6 border-t border-white/10 space-y-2">
+                        <a :href="getOrigUrl(activePhoto.id)" target="_blank" download
+                           class="w-full py-2.5 px-4 bg-brand-600 hover:bg-brand-500 text-white rounded-xl text-xs font-bold text-center block transition">
+                            Unduh File Foto Asli
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </template>
+    </div>
+
+</body>
+</html>
