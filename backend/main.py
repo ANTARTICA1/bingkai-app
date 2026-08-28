@@ -2,7 +2,7 @@ import os
 import logging
 from pathlib import Path
 from contextlib import asynccontextmanager
-from typing import Optional
+from typing import Optional, List
 
 from fastapi import FastAPI, Depends, HTTPException, status, Response, Request, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,11 +16,13 @@ from backend.config import (
     get_local_ip_addresses
 )
 from backend.database import engine, Base, get_db
-from backend.models import User, Folder, Photo
+from backend.models import User, Folder, Photo, Album
 from backend.schemas import (
     UserLogin, UserOut,
     FolderCreate, FolderOut,
-    PhotoOut, PhotoDetailOut, PaginatedPhotosOut,
+    PhotoOut, PhotoDetailOut, PhotoRename, PhotoMove, PaginatedPhotosOut,
+    AlbumCreate, AlbumOut, AlbumDetailOut,
+    DuplicateGroupOut,
     ScanResultOut, DashboardStatsOut, SystemInfoOut
 )
 from backend.security import (
@@ -33,7 +35,13 @@ from backend.thumbnail_service import generate_thumbnail
 from backend.scanner import scan_folder
 from backend.photo_service import (
     get_photos, get_photo_by_id,
-    toggle_photo_favorite, get_dashboard_statistics
+    toggle_photo_favorite, rename_photo, move_photo,
+    move_photo_to_trash, restore_photo_from_trash,
+    delete_photo_permanently, empty_trash, get_trash_photos,
+    get_duplicate_photos,
+    create_album, get_albums, get_album_by_id,
+    add_photo_to_album, remove_photo_from_album, delete_album,
+    get_dashboard_statistics
 )
 
 logging.basicConfig(
@@ -254,12 +262,141 @@ def toggle_favorite(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Foto tidak ditemukan.")
     return photo
 
+@app.patch("/api/photos/{photo_id}/rename", response_model=PhotoOut)
+def rename_photo_endpoint(
+    photo_id: int,
+    payload: PhotoRename,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    return rename_photo(photo_id, payload.name, db)
+
+@app.post("/api/photos/{photo_id}/move", response_model=PhotoOut)
+def move_photo_endpoint(
+    photo_id: int,
+    payload: PhotoMove,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    return move_photo(photo_id, payload.target_folder_id, db)
+
+@app.post("/api/photos/{photo_id}/trash", response_model=PhotoOut)
+def trash_photo_endpoint(
+    photo_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    return move_photo_to_trash(photo_id, db)
+
+@app.post("/api/photos/{photo_id}/restore", response_model=PhotoOut)
+def restore_photo_endpoint(
+    photo_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    return restore_photo_from_trash(photo_id, db)
+
+@app.delete("/api/photos/{photo_id}/permanent")
+def delete_permanent_endpoint(
+    photo_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    return delete_photo_permanently(photo_id, db)
+
+@app.get("/api/trash", response_model=PaginatedPhotosOut)
+def list_trash(
+    page: int = Query(1, ge=1),
+    limit: int = Query(50, ge=1, le=200),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    return get_trash_photos(db, page=page, limit=limit)
+
+@app.delete("/api/trash/empty")
+def empty_trash_endpoint(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    return empty_trash(db)
+
+@app.get("/api/duplicates", response_model=List[DuplicateGroupOut])
+def list_duplicates(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    return get_duplicate_photos(db)
+
+@app.get("/api/albums", response_model=List[AlbumOut])
+def list_albums(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    return get_albums(db)
+
+@app.post("/api/albums", response_model=AlbumOut)
+def create_album_endpoint(
+    payload: AlbumCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    album = create_album(payload.name, payload.description, db)
+    return AlbumOut(
+        id=album.id,
+        name=album.name,
+        description=album.description,
+        created_at=album.created_at,
+        photo_count=0
+    )
+
+@app.get("/api/albums/{album_id}", response_model=AlbumDetailOut)
+def get_album_detail_endpoint(
+    album_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    album = get_album_by_id(album_id, db)
+    active_photos = [p for p in album.photos if p.deleted_at is None]
+    return AlbumDetailOut(
+        id=album.id,
+        name=album.name,
+        description=album.description,
+        created_at=album.created_at,
+        photos=active_photos
+    )
+
+@app.delete("/api/albums/{album_id}")
+def delete_album_endpoint(
+    album_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    return delete_album(album_id, db)
+
+@app.post("/api/albums/{album_id}/photos/{photo_id}")
+def add_photo_album_endpoint(
+    album_id: int,
+    photo_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    return add_photo_to_album(album_id, photo_id, db)
+
+@app.delete("/api/albums/{album_id}/photos/{photo_id}")
+def remove_photo_album_endpoint(
+    album_id: int,
+    photo_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    return remove_photo_from_album(album_id, photo_id, db)
+
 @app.get("/api/photos/{photo_id}/thumbnail")
 def get_photo_thumbnail(
     photo_id: int,
     db: Session = Depends(get_db)
 ):
-    photo = get_photo_by_id(photo_id, db)
+    photo = db.query(Photo).filter(Photo.id == photo_id).first()
     if not photo:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Foto tidak ditemukan.")
 

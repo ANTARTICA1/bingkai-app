@@ -107,6 +107,85 @@ const BingkaiAPI = {
         });
     },
 
+    async renamePhoto(photoId, name) {
+        return this.request(`/api/photos/${photoId}/rename`, {
+            method: 'PATCH',
+            body: { name }
+        });
+    },
+
+    async movePhoto(photoId, targetFolderId) {
+        return this.request(`/api/photos/${photoId}/move`, {
+            method: 'POST',
+            body: { target_folder_id: parseInt(targetFolderId) }
+        });
+    },
+
+    async moveToTrash(photoId) {
+        return this.request(`/api/photos/${photoId}/trash`, {
+            method: 'POST'
+        });
+    },
+
+    async restoreFromTrash(photoId) {
+        return this.request(`/api/photos/${photoId}/restore`, {
+            method: 'POST'
+        });
+    },
+
+    async deletePermanently(photoId) {
+        return this.request(`/api/photos/${photoId}/permanent`, {
+            method: 'DELETE'
+        });
+    },
+
+    async getTrash({ page = 1, limit = 50 } = {}) {
+        return this.request(`/api/trash?page=${page}&limit=${limit}`);
+    },
+
+    async emptyTrash() {
+        return this.request('/api/trash/empty', {
+            method: 'DELETE'
+        });
+    },
+
+    async getDuplicates() {
+        return this.request('/api/duplicates');
+    },
+
+    async getAlbums() {
+        return this.request('/api/albums');
+    },
+
+    async createAlbum(name, description = null) {
+        return this.request('/api/albums', {
+            method: 'POST',
+            body: { name, description }
+        });
+    },
+
+    async getAlbumDetail(albumId) {
+        return this.request(`/api/albums/${albumId}`);
+    },
+
+    async deleteAlbum(albumId) {
+        return this.request(`/api/albums/${albumId}`, {
+            method: 'DELETE'
+        });
+    },
+
+    async addPhotoToAlbum(albumId, photoId) {
+        return this.request(`/api/albums/${albumId}/photos/${photoId}`, {
+            method: 'POST'
+        });
+    },
+
+    async removePhotoFromAlbum(albumId, photoId) {
+        return this.request(`/api/albums/${albumId}/photos/${photoId}`, {
+            method: 'DELETE'
+        });
+    },
+
     getThumbnailUrl(photoId) {
         return `/api/photos/${photoId}/thumbnail`;
     },

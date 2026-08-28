@@ -46,11 +46,18 @@ class PhotoOut(BaseModel):
     hash: str
     thumbnail_path: Optional[str] = None
     indexed_at: datetime.datetime
+    deleted_at: Optional[datetime.datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
 
 class PhotoDetailOut(PhotoOut):
     file_path: str
+
+class PhotoRename(BaseModel):
+    name: str
+
+class PhotoMove(BaseModel):
+    target_folder_id: int
 
 class PaginatedPhotosOut(BaseModel):
     items: List[PhotoOut]
@@ -60,6 +67,37 @@ class PaginatedPhotosOut(BaseModel):
     total_pages: int
     has_next: bool
     has_prev: bool
+
+
+class AlbumCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+
+class AlbumOut(BaseModel):
+    id: int
+    name: str
+    description: Optional[str] = None
+    created_at: datetime.datetime
+    photo_count: int = 0
+
+    model_config = ConfigDict(from_attributes=True)
+
+class AlbumDetailOut(BaseModel):
+    id: int
+    name: str
+    description: Optional[str] = None
+    created_at: datetime.datetime
+    photos: List[PhotoOut] = []
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class DuplicateGroupOut(BaseModel):
+    hash: str
+    file_size: int
+    file_size_formatted: str
+    count: int
+    items: List[PhotoDetailOut]
 
 
 class ScanResultOut(BaseModel):
@@ -78,6 +116,8 @@ class DashboardStatsOut(BaseModel):
     total_storage_formatted: str
     total_favorites: int
     total_folders: int
+    total_trash: int = 0
+    total_duplicates: int = 0
     format_counts: dict
     largest_folders: list
 

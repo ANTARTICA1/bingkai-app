@@ -1,161 +1,131 @@
-# 🖼️ Bingkai — Local Photo Manager & Remote Controller
+# Bingkai — Local Photo Manager & Remote Controller
 
-> *"Membantu yang berserakan kembali beraturan"*
+> "Membantu yang berserakan kembali beraturan"
 
-**Bingkai** adalah aplikasi manajemen foto lokal (*local-first*) modern yang membantu Anda mengelola, mencari, dan meninjau ribuan foto yang tersimpan di laptop/PC langsung melalui browser, termasuk dari smartphone (HP) yang terhubung ke jaringan Wi-Fi lokal yang sama.
-
-Aplikasi ini **bukan cloud photo storage**. Foto asli tetap 100% tersimpan di komputer Anda. Bingkai hanya melakukan pengindeksan cerdas, membuat thumbnail terkompresi cepat, membaca metadata EXIF, dan memberikan kendali penuh melalui antarmuka web modern tanpa perlu upload ke cloud pihak ketiga.
+Aplikasi manajemen ribuan koleksi foto lokal di komputer/laptop dengan antarmuka web modern, cepat, aman, dan dapat dikontrol dari Smartphone (Wi-Fi) maupun Stick Game (Gamepad Controller).
 
 ---
 
-## ✨ Fitur Utama (Phase 1 — Core MVP)
+## Konsep Aplikasi
 
-- **Local-First & Privasi 100%**: Tidak ada data atau foto yang dikirim ke server eksternal/cloud.
-- **Remote Controller (Akses dari HP)**: Cukup sambungkan HP ke Wi-Fi yang sama untuk melihat, mencari, dan menandai foto di PC.
-- **Fast Recursive Photo Scanner**: Memindai direktori komputer dan subfolder (`.jpg`, `.jpeg`, `.png`, `.webp`, `.bmp`, `.gif`).
-- **Smart Change Detection**: Hanya memproses foto baru atau yang berubah berdasarkan kombinasi ukuran file, mtime, dan hash SHA-256.
-- **High-Performance Thumbnail System**: Otomatis menghasilkan thumbnail WebP ringan (320x320) dengan orientasi rotasi EXIF yang tepat agar galeri memuat instan.
-- **Modern Responsive Gallery**: Tampilan grid terkelompok tanggal (*Hari Ini, Kemarin, Bulan, Tahun*) dengan lazy loading dan filter cepat.
-- **Full-Screen Photo Viewer**: Melihat foto resolusi asli lengkap dengan info metadata EXIF, dimensi, ukuran file, dan tombol favorit.
-- **Sistem Pencarian & Sorting Cepat**: Cari instan berdasarkan nama file, subfolder, atau ekstensi file di database SQLite lokal.
-- **Keamanan & Anti-Path Traversal**: Dilengkapi sistem autentikasi session dan validasi direktori terdaftar untuk mencegah manipulasi path di luar folder yang diizinkan.
-- **Zero Build Frontend**: Antarmuka frontend menggunakan **Alpine.js** dan **Tailwind CSS** melalui CDN tanpa memerlukan Node.js atau proses build rumit.
+Bingkai adalah Local Photo Manager dan Remote Controller. Aplikasi ini dirancang untuk memudahkan pengguna mengelola foto yang tersimpan di harddisk komputer tanpa harus mengunggah file foto ke cloud eksternal.
+
+Prinsip kerja utama:
+1. Foto asli tetap berada di direktori lokal komputer pengguna (misalnya D:/Photos, D:/Pictures, atau C:/Users/User/Pictures).
+2. Database SQLite hanya menyimpan indeks lokasi file dan metadata (tanggal pembuatan, EXIF, dimensi, ukuran file, dan hash).
+3. Backend menyajikan thumbnail ringan format WebP untuk performa rendering galeri yang cepat.
+4. Pengguna dapat mengontrol galeri dari browser laptop, smartphone di jaringan Wi-Fi lokal, atau menggunakan stick gamepad controller.
 
 ---
 
-## 🏗️ Arsitektur Sistem
+## Fitur Utama
 
-```
-HP / Smartphone (Wi-Fi)      Desktop Browser (Localhost)
-          │                               │
-          └───────────────┬───────────────┘
-                          │ HTTP REST API (Fetch)
-                          ▼
-            [ FastAPI Backend (Python) ]
-              ├── Security & Path Sanitizer
-              ├── Recursive Scanner & Hasher
-              └── Pillow Thumbnail Engine
-                          │
-          ┌───────────────┴───────────────┐
-          ▼                               ▼
-  [ SQLite (bingkai.db) ]      [ Local File System PC ]
-  - Metadata foto & folder     - Foto Asli (D:/Photos, Pictures)
-  - Hash SHA-256 & EXIF        - data/thumbnails/ (Cache WebP)
-  - Status Favorit & Albums    - data/trash/ (Soft-delete)
-```
+- **Local-First dan Privasi**: Semua proses indexing, caching thumbnail, dan manajemen file berlangsung secara lokal di komputer pengguna. Tidak ada data yang dikirim keluar.
+- **Gamepad dan Stick Controller Support**: Kontrol galeri foto di monitor atau layar TV menggunakan stick game USB atau Bluetooth (Xbox, PlayStation, Logitech, atau stick generik).
+- **Remote Controller Smartphone**: Akses dan kelola foto dari smartphone yang terhubung ke jaringan Wi-Fi yang sama tanpa perlu menginstal aplikasi tambahan.
+- **Sistem Trash dan Restore**: Penghapusan aman dengan memindahkan file ke direktori sampah khusus. Foto dapat dipulihkan kembali ke folder aslinya atau dihapus permanen.
+- **Rename dan Move Aman**: Ubah nama file dan pindahkan foto antar folder terdaftar dengan proteksi pencegahan directory traversal dan penanganan konflik nama otomatis.
+- **Virtual Albums**: Buat album koleksi kustom tanpa menduplikasi atau memindahkan file fisik foto di harddisk.
+- **Deteksi Foto Duplikat**: Temukan file foto yang identik secara byte berdasarkan komparasi hash SHA-256 dan pilih salinan yang ingin dibersihkan.
+- **Performa Tinggi**: Database SQLite dengan mode WAL (Write-Ahead Logging), session authentication berbasis cookie HttpOnly, dan generator thumbnail Pillow WebP.
+- **Antarmuka Modern**: Desain glassmorphism responsif dengan dukungan Dark Mode.
 
 ---
 
-## ⚡ Pemilihan Library Frontend (CDN)
+## Panduan Penggunaan: Stick Game (Gamepad Controller)
 
-Frontend Bingkai dibangun tanpa *Node.js* atau *Webpack/Vite*, menggunakan library CDN versi terkunci:
+Bingkai mendukung Gamepad API standar browser untuk mendeteksi controller yang terhubung ke laptop/PC.
 
-1. **Tailwind CSS** (`v3.4.17`): Layout responsif, transisi modern, dan styling dark mode tanpa CSS compiler.
-2. **Alpine.js** (`v3.14.8`): Framework reaktif mini (~15KB) untuk kontrol modal, filter galeri, form login, dan interaksi tanpa overhead framework besar.
-3. **Lucide Icons** (`v0.475.0`): Icon vector minimalis dengan teks fallback.
-4. **Google Fonts (Plus Jakarta Sans)**: Tipografi modern dan bersih.
+Daftar Fungsi Tombol Gamepad:
+- **D-Pad (Tombol Panah) / Analog Stick**: Menggeser dan memilih kartu foto di galeri.
+- **Tombol A / Cross**: Membuka foto yang dipilih ke mode layar penuh (Viewer).
+- **Tombol B / Circle**: Menutup mode layar penuh dan kembali ke galeri.
+- **Tombol X / Square**: Menandai atau membatalkan status Favorit pada foto.
+- **Tombol Y / Triangle**: Membuka dialog untuk mengubah nama file foto (Rename).
+- **Tombol LB / RB**: Berpindah ke halaman galeri sebelumnya atau berikutnya.
 
-> **Catatan Kemandirian Offline:** Library CDN akan otomatis di-cache oleh browser setelah pertama kali dibuka. Untuk penggunaan 100% offline tanpa internet sejak instalasi pertama, library ini dapat diunduh ke folder `frontend/vendor/` pada tahap rilis berikutnya.
-
----
-
-## 📁 Struktur Project
-
-```
-bingkai-app/
-├── backend/
-│   ├── main.py                # Server FastAPI & endpoint routing
-│   ├── config.py              # Konfigurasi sistem, direktori, & deteksi IP
-│   ├── database.py            # SQLite engine (WAL mode + Foreign Keys)
-│   ├── models.py              # SQLAlchemy ORM models
-│   ├── schemas.py             # Pydantic validation schemas
-│   ├── security.py            # Hashing Bcrypt, session token, validator path
-│   ├── scanner.py             # Recursive filesystem scanner & EXIF reader
-│   ├── thumbnail_service.py   # Kompresi & pembuatan thumbnail Pillow
-│   └── photo_service.py       # Query galeri, filter, pencarian, statistik
-├── frontend/
-│   ├── index.html             # Antarmuka SPA responsif
-│   ├── css/
-│   │   └── style.css          # Styling kustom & font
-│   ├── js/
-│   │   ├── api.js             # Fetch API client layer
-│   │   ├── gallery.js         # Pengelompokan tanggal & format galeri
-│   │   └── app.js             # State management Alpine.js
-│   └── assets/
-│       └── logo.svg           # Logo branding Bingkai
-├── data/
-│   ├── bingkai.db             # File database SQLite lokal
-│   ├── thumbnails/            # Cache thumbnail WebP
-│   └── trash/                 # Folder soft-delete foto
-├── requirements.txt           # Dependency Python minimal
-├── README.md                  # Dokumentasi aplikasi
-└── .gitignore                 # Exclusion data pribadi & DB
-```
+Langkah Penggunaan Gamepad:
+1. Sambungkan gamepad ke laptop/PC melalui kabel USB atau koneksi Bluetooth.
+2. Buka aplikasi Bingkai di browser (http://localhost:8080).
+3. Tekan salah satu tombol pada gamepad untuk mengaktifkan pendeteksian.
+4. Indikator status controller dan petunjuk tombol akan tampil di layar.
 
 ---
 
-## 🚀 Panduan Menjalankan Aplikasi
+## Panduan Penggunaan: Smartphone Remote Controller
 
-### 1. Prasyarat
-- Python 3.10 atau versi yang lebih baru terinstal di PC/laptop Anda.
-- Tidak memerlukan Node.js atau npm.
+1. Pastikan komputer dan smartphone terhubung pada jaringan Wi-Fi yang sama.
+2. Buka browser di smartphone (Google Chrome, Safari, atau Firefox).
+3. Masukkan alamat IP lokal komputer beserta port aplikasi, contoh:
+   ```text
+   http://192.168.1.2:8080
+   ```
+4. Masuk menggunakan akun default:
+   - Username: `admin`
+   - Password: `admin123`
+5. Galeri foto komputer kini dapat dikontrol langsung dari smartphone.
 
-### 2. Instalasi Dependency
-Buka Terminal / PowerShell di folder project `bingkai-app`:
+---
 
+## Panduan Menjalankan Aplikasi
+
+### 1. Prasyarat Sistem
+- Python versi 3.10 atau yang lebih baru.
+- Sistem operasi Windows, macOS, atau Linux.
+
+### 2. Instalasi Dependensi
+Buka terminal pada folder project dan jalankan:
 ```bash
-# Buat virtual environment (opsional tetapi disarankan)
-python -m venv venv
-
-# Aktifkan virtual environment di Windows:
-venv\Scripts\activate
-
-# Install dependency backend Python:
 pip install -r requirements.txt
 ```
 
-### 3. Menjalankan Server Bingkai
+### 3. Menjalankan Server
 Jalankan perintah berikut:
-
 ```bash
-uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
+python -m uvicorn backend.main:app --host 0.0.0.0 --port 8080 --reload
+```
+
+Akses aplikasi melalui:
+- Browser Komputer: `http://localhost:8080`
+- Browser Smartphone: `http://<IP-LOKAL-KOMPUTER>:8080`
+
+---
+
+## Penjelasan Struktur File dan Direktori
+
+```text
+bingkai-app/
+├── backend/
+│   ├── __init__.py            # Inisialisasi package backend
+│   ├── config.py              # Konfigurasi path direktori, secret key, dan deteksi IP lokal
+│   ├── database.py            # Konfigurasi engine SQLite, sesi koneksi, dan pragma WAL mode
+│   ├── models.py              # Definisi model tabel ORM (User, Folder, Photo, Album, album_photos)
+│   ├── schemas.py             # Skema validasi data request dan response Pydantic
+│   ├── security.py            # Hashing password Bcrypt, validasi session token, dan validasi path
+│   ├── scanner.py             # Pemindai folder rekursif, ekstraksi metadata EXIF, dan hashing SHA-256
+│   ├── thumbnail_service.py   # Generator thumbnail WebP berbasis Pillow dengan auto-orientasi EXIF
+│   ├── photo_service.py       # Logika bisnis galeri, filter, sort, trash, move, rename, dan album
+│   └── main.py                # Server FastAPI, konfigurasi CORS, autentikasi, dan routing endpoint API
+├── frontend/
+│   ├── index.html             # Tampilan Single Page Application utama (Alpine.js dan Tailwind CSS)
+│   ├── css/
+│   │   └── style.css          # Kustomisasi CSS, styling scrollbar, shimmer, dan glassmorphism
+│   ├── js/
+│   │   ├── api.js             # Modul komunikasi Fetch API ke backend FastAPI
+│   │   ├── gallery.js         # Fungsi helper format ukuran file dan pengelompokan tanggal
+│   │   └── app.js             # State management Alpine.js dan loop input Gamepad Controller
+│   └── assets/
+│       └── logo.svg           # Aset vector logo aplikasi Bingkai
+├── data/                      # Direktori data lokal runtime (database SQLite, thumbnail cache, trash)
+├── requirements.txt           # Daftar dependensi library Python yang dibutuhkan
+└── README.md                  # Dokumentasi komprehensif project
 ```
 
 ---
 
-## 📱 Cara Mengakses dari Smartphone (Remote Controller)
+## Keamanan dan Validasi
 
-1. Pastikan laptop/PC Anda dan HP Anda terhubung ke **jaringan Wi-Fi yang sama**.
-2. Cari tahu IP lokal laptop/PC Anda:
-   - **Windows**: Buka CMD/PowerShell, ketik `ipconfig`, lalu lihat bagian `IPv4 Address` (contoh: `192.168.1.15`).
-   - Atau langsung lihat pada halaman **Remote HP & Setelan** di aplikasi Bingkai.
-3. Buka browser di HP (Chrome / Safari), ketikkan alamat:
-   ```
-   http://192.168.1.15:8000
-   ```
-   *(Ganti `192.168.1.15` dengan IP lokal PC Anda).*
-4. Masuk dengan akun administrator default:
-   - **Username**: `admin`
-   - **Password**: `admin123`
-
----
-
-## 🔒 Keamanan & Validasi
-
-- **Pencegahan Directory Traversal**: API menolak semua request yang mencoba mengakses file sistem di luar folder yang telah didaftarkan (`../../Windows/System32`, dll).
-- **Sanitasi File & Path**: Semua input nama file disanitasi dari null bytes (`\x00`) dan karakter kontrol berbahaya.
-- **Session Aman**: Autentikasi menggunakan cookie `HttpOnly` dengan enkripsi token URLSafe bertanda tangan digital.
-- **Tanpa Overwrite Fisik Tanpa Konfirmasi**: Operasi sensitif divalidasi ganda di backend dan database.
-
----
-
-## 🗺️ Roadmap Prioritas Pengembangan
-
-- [x] **Phase 1 — Core MVP** (Struktur project, SQLite ORM, Scanner Rekursif, Thumbnail Generator, Galeri Responsif CDN, Autentikasi, Remote HP).
-- [ ] **Phase 2 — Management** (Fitur Move/Rename antar folder aman, Sistem Trash & Restore, Album Virtual many-to-many, Deteksi Duplikat SHA-256).
-- [ ] **Phase 3 — Advanced** (Background Folder Monitoring menggunakan Watchdog, Activity Log, Full Offline Vendor Bundle).
-
----
-
-## 📄 Lisensi
-Dikembangkan dengan ❤️ untuk membantu foto Anda yang berserakan kembali beraturan.
+- **Pencegahan Directory Traversal**: Backend memvalidasi setiap path file agar selalu berada di dalam folder yang terdaftar.
+- **Sanitasi Nama File**: Karakter berbahaya dan null bytes disaring saat proses rename dan move file.
+- **Session Authentication**: Token sesi dienkripsi dengan serializer bertanda tangan waktu dan disimpan dalam cookie HttpOnly.
+- **Isolasi Data**: Direktori data lokal (database, cache thumbnail, dan trash) dikecualikan dari repository git untuk menjaga privasi pengguna.
