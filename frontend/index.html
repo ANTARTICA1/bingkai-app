@@ -34,6 +34,7 @@
         }
     </script>
 
+    <script src="/js/qrcode.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/lucide@0.475.0/dist/umd/lucide.min.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"></script>
 
@@ -194,7 +195,7 @@
                                 class="w-full flex items-center gap-3 px-3 py-2 rounded-xl font-medium text-xs transition"
                                 :class="currentView === 'settings' ? 'bg-slate-100 dark:bg-slate-800 font-bold text-slate-900 dark:text-white' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'">
                             <i data-lucide="smartphone" class="w-3.5 h-3.5 text-emerald-500"></i>
-                            <span>Remote HP & Setelan</span>
+                            <span>Remote HP & QR Code</span>
                         </button>
                     </div>
 
@@ -253,6 +254,12 @@
                     </div>
 
                     <div class="flex items-center gap-2 sm:gap-3">
+                        <button @click="openQrModal()" title="Buka Remote di Smartphone (Scan QR)"
+                                class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-semibold transition border border-emerald-500/20 shadow-sm">
+                            <i data-lucide="qr-code" class="w-4 h-4"></i>
+                            <span class="hidden sm:inline">Scan QR HP</span>
+                        </button>
+
                         <button @click="isShortcutsModalOpen = true" title="Panduan Tombol & Pintasan (?)"
                                 class="flex items-center gap-1 px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-brand-50 dark:hover:bg-brand-900/30 text-slate-700 dark:text-slate-300 text-xs font-semibold transition border border-slate-200 dark:border-slate-700">
                             <i data-lucide="keyboard" class="w-4 h-4 text-brand-500"></i>
@@ -708,33 +715,51 @@
                         </template>
                     </div>
 
-                    <div x-show="currentView === 'settings'" class="max-w-3xl mx-auto space-y-6">
+                    <div x-show="currentView === 'settings'" class="max-w-4xl mx-auto space-y-6">
                         <div class="mb-6">
                             <h2 class="text-2xl font-extrabold tracking-tight">Akses Remote HP & Setelan</h2>
                             <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Buka galeri dan kontrol foto dari smartphone Anda melalui jaringan Wi-Fi lokal.</p>
                         </div>
 
                         <div class="p-6 rounded-3xl bg-gradient-to-br from-indigo-900/30 to-brand-900/30 border border-brand-500/30 backdrop-blur-xl">
-                            <div class="flex items-start gap-4">
-                                <div class="p-3 rounded-2xl bg-brand-500 text-white shadow-lg shadow-brand-500/30">
-                                    <i data-lucide="smartphone" class="w-6 h-6"></i>
+                            <div class="flex flex-col md:flex-row items-center gap-6">
+                                
+                                <div class="p-4 bg-white rounded-3xl shadow-2xl flex-shrink-0 border-4 border-brand-500/30 flex flex-col items-center">
+                                    <template x-if="systemInfo && systemInfo.remote_urls && qrCodes[systemInfo.remote_urls[0]]">
+                                        <img :src="qrCodes[systemInfo.remote_urls[0]]" alt="QR Code Remote" class="w-48 h-48 object-contain">
+                                    </template>
+                                    <div x-show="!systemInfo || !systemInfo.remote_urls || !qrCodes[systemInfo.remote_urls[0]]" class="w-48 h-48 bg-slate-100 flex items-center justify-center rounded-2xl">
+                                        <i data-lucide="qr-code" class="w-12 h-12 text-slate-400 animate-pulse"></i>
+                                    </div>
+                                    <p class="text-[11px] font-bold text-slate-800 mt-2 uppercase tracking-wider">Scan Kamera HP</p>
                                 </div>
-                                <div class="flex-1">
-                                    <h3 class="text-lg font-bold text-slate-900 dark:text-white">Akses dari Smartphone (Remote Controller)</h3>
-                                    <p class="text-xs text-slate-600 dark:text-slate-300 mt-1 leading-relaxed">
-                                        Pastikan smartphone Anda terhubung ke <strong>jaringan Wi-Fi yang sama</strong> dengan PC ini. Buka browser HP dan ketikkan alamat berikut:
+
+                                <div class="flex-1 text-center md:text-left">
+                                    <span class="px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold inline-flex items-center gap-1 mb-2">
+                                        <i data-lucide="wifi" class="w-3.5 h-3.5"></i>
+                                        <span>Wi-Fi Remote Ready</span>
+                                    </span>
+                                    <h3 class="text-xl font-black text-slate-900 dark:text-white">Arahkan Kamera HP ke QR Code</h3>
+                                    <p class="text-xs text-slate-600 dark:text-slate-300 mt-1.5 leading-relaxed">
+                                        Pastikan HP dan PC berada di <strong>jaringan Wi-Fi yang sama</strong>. Buka aplikasi kamera di HP Anda dan scan QR Code di samping untuk langsung membuka aplikasi Bingkai.
                                     </p>
 
                                     <div class="mt-4 space-y-2">
                                         <template x-if="systemInfo">
                                             <template x-for="url in systemInfo.remote_urls" :key="url">
-                                                <div class="flex items-center justify-between p-3 rounded-xl bg-white dark:bg-slate-900 border border-brand-500/20 font-mono text-sm font-bold text-brand-600 dark:text-brand-400 select-all">
+                                                <div class="flex items-center justify-between p-3 rounded-2xl bg-white dark:bg-slate-900 border border-brand-500/20 font-mono text-xs font-bold text-brand-600 dark:text-brand-400 select-all">
                                                     <span x-text="url"></span>
-                                                    <span class="text-[10px] uppercase font-sans font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500">Aktif</span>
+                                                    <button @click="copyFilePath(url)" class="px-2 py-1 rounded-lg bg-brand-50 dark:bg-brand-900/40 text-brand-600 dark:text-brand-400 hover:bg-brand-100 text-[10px] font-sans font-semibold transition">
+                                                        Salin Link
+                                                    </button>
                                                 </div>
                                             </template>
                                         </template>
                                     </div>
+
+                                    <p class="text-[11px] text-slate-400 mt-3">
+                                        Login lokal: <code class="px-1.5 py-0.5 bg-black/30 rounded text-brand-300">admin / admin123</code>
+                                    </p>
                                 </div>
                             </div>
                         </div>
@@ -790,6 +815,46 @@
             </button>
         </nav>
     </template>
+
+    <div x-show="isQrModalOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md"
+         @click.self="isQrModalOpen = false">
+        <div class="w-full max-w-sm bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 text-center">
+            <div class="flex items-center justify-between mb-4 pb-2 border-b border-slate-100 dark:border-slate-800">
+                <div class="flex items-center gap-2">
+                    <i data-lucide="smartphone" class="w-5 h-5 text-emerald-500"></i>
+                    <h3 class="font-bold text-base text-slate-900 dark:text-white">Scan QR Remote HP</h3>
+                </div>
+                <button @click="isQrModalOpen = false" class="p-1 rounded-lg text-slate-400 hover:text-slate-600">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+            </div>
+
+            <div class="p-4 bg-white rounded-2xl shadow-inner inline-block my-2 border-2 border-brand-500/20">
+                <template x-if="activeQrUrl && qrCodes[activeQrUrl]">
+                    <img :src="qrCodes[activeQrUrl]" alt="QR Code Remote" class="w-56 h-56 object-contain mx-auto">
+                </template>
+            </div>
+
+            <p class="text-xs font-bold text-slate-800 dark:text-slate-200 mt-2">
+                Arahkan Kamera HP ke QR Code
+            </p>
+            <p class="text-[11px] text-slate-400 mt-0.5">
+                Pastikan HP dan PC terhubung ke Wi-Fi yang sama
+            </p>
+
+            <div class="mt-4 p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 font-mono text-xs font-bold text-brand-600 dark:text-brand-400 break-all select-all"
+                 x-text="activeQrUrl"></div>
+
+            <div class="mt-4 flex gap-2">
+                <button @click="copyFilePath(activeQrUrl)" class="flex-1 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-semibold hover:bg-slate-200 dark:hover:bg-slate-700 transition">
+                    Salin URL
+                </button>
+                <button @click="isQrModalOpen = false" class="flex-1 py-2 bg-brand-600 hover:bg-brand-500 text-white text-xs font-bold rounded-xl shadow transition">
+                    Tutup
+                </button>
+            </div>
+        </div>
+    </div>
 
     <div x-show="isAddFolderModalOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm"
          @click.self="isAddFolderModalOpen = false">

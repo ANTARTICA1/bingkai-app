@@ -82,6 +82,9 @@ document.addEventListener('alpine:init', () => {
         dashboardStats: null,
         isLoadingDashboard: false,
         systemInfo: null,
+        qrCodes: {},
+        isQrModalOpen: false,
+        activeQrUrl: '',
 
         toasts: [],
 
@@ -126,13 +129,13 @@ document.addEventListener('alpine:init', () => {
             });
 
             window.addEventListener('keydown', (e) => {
-                if (e.key === '?' && !this.isRenameModalOpen && !this.isAddFolderModalOpen && !this.isCreateAlbumModalOpen) {
+                if (e.key === '?' && !this.isRenameModalOpen && !this.isAddFolderModalOpen && !this.isCreateAlbumModalOpen && !this.isQrModalOpen) {
                     this.isShortcutsModalOpen = !this.isShortcutsModalOpen;
                     return;
                 }
 
                 if (!this.isViewerOpen) return;
-                if (this.isRenameModalOpen || this.isMoveModalOpen || this.isAddToAlbumModalOpen || this.isShortcutsModalOpen) return;
+                if (this.isRenameModalOpen || this.isMoveModalOpen || this.isAddToAlbumModalOpen || this.isShortcutsModalOpen || this.isQrModalOpen) return;
 
                 if (e.key === 'Escape') this.closeViewer();
                 if (e.key === 'ArrowRight') this.nextPhoto();
@@ -863,9 +866,42 @@ document.addEventListener('alpine:init', () => {
         async loadSystemInfo() {
             try {
                 this.systemInfo = await BingkaiAPI.getSystemInfo();
+                this.generateQrCodes();
             } catch (e) {
                 console.error(e);
             }
+        },
+
+        generateQrCodes() {
+            if (!this.systemInfo || !this.systemInfo.remote_urls) return;
+            this.qrCodes = {};
+            for (const url of this.systemInfo.remote_urls) {
+                try {
+                    if (window.BingkaiQR && window.BingkaiQR.generateSvg) {
+                        this.qrCodes[url] = window.BingkaiQR.generateSvg(url, 260);
+                    }
+                } catch (err) {
+                    console.error(err);
+                }
+            }
+            if (!this.activeQrUrl && this.systemInfo.remote_urls.length > 0) {
+                this.activeQrUrl = this.systemInfo.remote_urls[0];
+            }
+        },
+
+        openQrModal(url = null) {
+            if (url) {
+                this.activeQrUrl = url;
+            } else if (this.systemInfo && this.systemInfo.remote_urls && this.systemInfo.remote_urls.length > 0) {
+                this.activeQrUrl = this.systemInfo.remote_urls[0];
+            }
+            if (!this.qrCodes[this.activeQrUrl] && this.activeQrUrl) {
+                this.generateQrCodes();
+            }
+            this.isQrModalOpen = true;
+            this.$nextTick(() => {
+                if (window.lucide) window.lucide.createIcons();
+            });
         },
 
         formatSize(bytes) {
