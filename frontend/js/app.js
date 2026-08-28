@@ -73,6 +73,20 @@ document.addEventListener('alpine:init', () => {
         duplicateGroups: [],
         isLoadingDuplicates: false,
 
+        swipePhotos: [],
+        swipeIndex: 0,
+        swipeDeltaX: 0,
+        swipeDeltaY: 0,
+        swipeRotateDeg: 0,
+        swipeCardStatus: '',
+        swipeIsDragging: false,
+        isSwipeAnimating: false,
+        swipeStartX: 0,
+        swipeStartY: 0,
+        swipeHistory: [],
+        swipeSavedCount: 0,
+        swipeTrashedCount: 0,
+
         gamepadConnected: false,
         gamepadName: '',
         focusedPhotoIndex: 0,
@@ -134,6 +148,24 @@ document.addEventListener('alpine:init', () => {
                     return;
                 }
 
+                if (this.currentView === 'swipe') {
+                    if (this.isShortcutsModalOpen || this.isQrModalOpen) return;
+                    if (e.key === 'ArrowRight') {
+                        e.preventDefault();
+                        this.executeSwipeRight();
+                    } else if (e.key === 'ArrowLeft') {
+                        e.preventDefault();
+                        this.executeSwipeLeft();
+                    } else if (e.key === 'ArrowDown' || e.key === ' ') {
+                        e.preventDefault();
+                        this.executeSwipeSkip();
+                    } else if (e.key === 'Backspace' || e.key === 'u' || e.key === 'U') {
+                        e.preventDefault();
+                        this.undoLastSwipe();
+                    }
+                    return;
+                }
+
                 if (!this.isViewerOpen) return;
                 if (this.isRenameModalOpen || this.isMoveModalOpen || this.isAddToAlbumModalOpen || this.isShortcutsModalOpen || this.isQrModalOpen) return;
 
@@ -160,6 +192,18 @@ document.addEventListener('alpine:init', () => {
                 if (e.key === 'Delete') {
                     e.preventDefault();
                     this.trashActivePhoto();
+                }
+            });
+
+            window.addEventListener('mousemove', (e) => {
+                if (this.swipeIsDragging) {
+                    this.onDragMove(e.clientX, e.clientY);
+                }
+            });
+
+            window.addEventListener('mouseup', () => {
+                if (this.swipeIsDragging) {
+                    this.onDragEnd();
                 }
             });
         },
@@ -218,7 +262,7 @@ document.addEventListener('alpine:init', () => {
 
         handleGamepadInput(gp) {
             const now = Date.now();
-            if (now - this._lastGamepadAction < 220) return;
+            if (now - this._lastGamepadAction < 240) return;
 
             const bA = gp.buttons[0] && gp.buttons[0].pressed;
             const bB = gp.buttons[1] && gp.buttons[1].pressed;
@@ -231,6 +275,30 @@ document.addEventListener('alpine:init', () => {
             const dDown = gp.buttons[13] && gp.buttons[13].pressed || gp.axes[1] > 0.5;
             const dLeft = gp.buttons[14] && gp.buttons[14].pressed || gp.axes[0] < -0.5;
             const dRight = gp.buttons[15] && gp.buttons[15].pressed || gp.axes[0] > 0.5;
+
+            if (this.currentView === 'swipe') {
+                if (bA || dRight) {
+                    this.executeSwipeRight();
+                    this._lastGamepadAction = now;
+                    return;
+                }
+                if (bB || dLeft) {
+                    this.executeSwipeLeft();
+                    this._lastGamepadAction = now;
+                    return;
+                }
+                if (bY || dDown) {
+                    this.executeSwipeSkip();
+                    this._lastGamepadAction = now;
+                    return;
+                }
+                if (bX) {
+                    this.undoLastSwipe();
+                    this._lastGamepadAction = now;
+                    return;
+                }
+                return;
+            }
 
             if (this.isViewerOpen) {
                 if (bB) {
@@ -319,7 +387,7 @@ document.addEventListener('alpine:init', () => {
             this.toasts.push({ id, message, type });
             setTimeout(() => {
                 this.toasts = this.toasts.filter(t => t.id !== id);
-            }, 4000);
+            }, 3000);
         },
 
         async checkAuthStatus() {
@@ -379,6 +447,8 @@ document.addEventListener('alpine:init', () => {
                 this.loadPhotos(1);
             } else if (viewName === 'favorites') {
                 this.loadPhotos(1);
+            } else if (viewName === 'swipe') {
+                this.initSwipeDeck();
             } else if (viewName === 'folders') {
                 this.loadFolders();
             } else if (viewName === 'albums') {
@@ -393,6 +463,183 @@ document.addEventListener('alpine:init', () => {
                 this.loadSystemInfo();
                 this.loadFolders();
             }
+            this.$nextTick(() => {
+                if (window.lucide) window.lucide.createIcons();
+            });
+        },
+
+        async initSwipeDeck() {
+            if (this.photos.length === 0) {
+                await this.loadPhotos(1);
+            }
+            this.swipePhotos = [...this.photos];
+            this.swipeIndex = 0;
+            this.swipeHistory = [];
+            this.swipeSavedCount = 0;
+            this.swipeTrashedCount = 0;
+            this.resetSwipeCard();
+            this.$nextTick(() => {
+                if (window.lucide) window.lucide.createIcons();
+            });
+        },
+
+        resetSwipeCard() {
+            this.swipeDeltaX = 0;
+            this.swipeDeltaY = 0;
+            this.swipeRotateDeg = 0;
+            this.swipeCardStatus = '';
+            this.swipeIsDragging = false;
+            this.isSwipeAnimating = false;
+        },
+
+        onTouchStart(e) {
+            if (this.isSwipeAnimating) return;
+            const touch = e.touches[0];
+            this.swipeStartX = touch.clientX;
+            this.swipeStartY = touch.clientY;
+            this.swipeIsDragging = true;
+        },
+
+        onTouchMove(e) {
+            if (!this.swipeIsDragging || this.isSwipeAnimating) return;
+            const touch = e.touches[0];
+            this.onDragMove(touch.clientX, touch.clientY);
+        },
+
+        onTouchEnd() {
+            if (!this.swipeIsDragging || this.isSwipeAnimating) return;
+            this.onDragEnd();
+        },
+
+        onMouseDown(e) {
+            if (this.isSwipeAnimating) return;
+            this.swipeStartX = e.clientX;
+            this.swipeStartY = e.clientY;
+            this.swipeIsDragging = true;
+        },
+
+        onDragMove(clientX, clientY) {
+            this.swipeDeltaX = clientX - this.swipeStartX;
+            this.swipeDeltaY = (clientY - this.swipeStartY) * 0.4;
+            this.swipeRotateDeg = +(this.swipeDeltaX * 0.07).toFixed(1);
+
+            if (this.swipeDeltaX > 50) {
+                this.swipeCardStatus = 'save';
+            } else if (this.swipeDeltaX < -50) {
+                this.swipeCardStatus = 'trash';
+            } else {
+                this.swipeCardStatus = '';
+            }
+        },
+
+        onDragEnd() {
+            this.swipeIsDragging = false;
+            if (this.swipeDeltaX > 110) {
+                this.executeSwipeRight();
+            } else if (this.swipeDeltaX < -110) {
+                this.executeSwipeLeft();
+            } else {
+                this.isSwipeAnimating = true;
+                this.swipeDeltaX = 0;
+                this.swipeDeltaY = 0;
+                this.swipeRotateDeg = 0;
+                this.swipeCardStatus = '';
+                setTimeout(() => {
+                    this.isSwipeAnimating = false;
+                }, 280);
+            }
+        },
+
+        async executeSwipeRight() {
+            if (this.isSwipeAnimating || this.swipeIndex >= this.swipePhotos.length) return;
+            const currentPhoto = this.swipePhotos[this.swipeIndex];
+            this.isSwipeAnimating = true;
+            this.swipeDeltaX = window.innerWidth ? window.innerWidth * 0.8 : 600;
+            this.swipeRotateDeg = 25;
+            this.swipeCardStatus = 'save';
+
+            try {
+                await BingkaiAPI.toggleFavorite(currentPhoto.id);
+                currentPhoto.favorite = true;
+            } catch (e) {
+            }
+
+            this.swipeHistory.push({ photo: currentPhoto, action: 'save' });
+            this.swipeSavedCount++;
+            this.showToast(`'${currentPhoto.filename}' Disimpan ke Favorit`, 'success');
+
+            setTimeout(() => {
+                this.swipeIndex++;
+                this.resetSwipeCard();
+                this.$nextTick(() => {
+                    if (window.lucide) window.lucide.createIcons();
+                });
+            }, 320);
+        },
+
+        async executeSwipeLeft() {
+            if (this.isSwipeAnimating || this.swipeIndex >= this.swipePhotos.length) return;
+            const currentPhoto = this.swipePhotos[this.swipeIndex];
+            this.isSwipeAnimating = true;
+            this.swipeDeltaX = window.innerWidth ? -window.innerWidth * 0.8 : -600;
+            this.swipeRotateDeg = -25;
+            this.swipeCardStatus = 'trash';
+
+            try {
+                await BingkaiAPI.moveToTrash(currentPhoto.id);
+            } catch (e) {
+            }
+
+            this.swipeHistory.push({ photo: currentPhoto, action: 'trash' });
+            this.swipeTrashedCount++;
+            this.showToast(`'${currentPhoto.filename}' Dipindahkan ke Trash`, 'info');
+
+            setTimeout(() => {
+                this.swipeIndex++;
+                this.resetSwipeCard();
+                this.$nextTick(() => {
+                    if (window.lucide) window.lucide.createIcons();
+                });
+            }, 320);
+        },
+
+        executeSwipeSkip() {
+            if (this.isSwipeAnimating || this.swipeIndex >= this.swipePhotos.length) return;
+            const currentPhoto = this.swipePhotos[this.swipeIndex];
+            this.isSwipeAnimating = true;
+            this.swipeDeltaY = 400;
+            this.swipeRotateDeg = 0;
+
+            this.swipeHistory.push({ photo: currentPhoto, action: 'skip' });
+
+            setTimeout(() => {
+                this.swipeIndex++;
+                this.resetSwipeCard();
+                this.$nextTick(() => {
+                    if (window.lucide) window.lucide.createIcons();
+                });
+            }, 300);
+        },
+
+        async undoLastSwipe() {
+            if (this.swipeHistory.length === 0 || this.swipeIndex === 0) {
+                this.showToast('Belum ada aksi yang dapat di-undo', 'info');
+                return;
+            }
+            const last = this.swipeHistory.pop();
+            if (last.action === 'trash') {
+                try {
+                    await BingkaiAPI.restoreFromTrash(last.photo.id);
+                    this.swipeTrashedCount = Math.max(0, this.swipeTrashedCount - 1);
+                } catch (e) {
+                }
+            } else if (last.action === 'save') {
+                this.swipeSavedCount = Math.max(0, this.swipeSavedCount - 1);
+            }
+
+            this.swipeIndex = Math.max(0, this.swipeIndex - 1);
+            this.resetSwipeCard();
+            this.showToast(`Membatalkan aksi '${last.photo.filename}'`, 'info');
             this.$nextTick(() => {
                 if (window.lucide) window.lucide.createIcons();
             });
