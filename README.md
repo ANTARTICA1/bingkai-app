@@ -16,6 +16,18 @@ Prinsip kerja utama:
 3. Backend menyajikan thumbnail ringan format WebP untuk performa rendering galeri yang cepat.
 4. Pengguna dapat mengontrol galeri dari browser laptop, smartphone di jaringan Wi-Fi lokal, atau menggunakan stick gamepad controller.
 
+## Tangkapan Layar Aplikasi
+
+### Photo Viewer & File Inspector
+![Photo Viewer & File Inspector](docs/screenshots/bingkai_viewer.png)
+
+### Kendali Jarak Jauh via Smartphone (Wi-Fi Lokal)
+![Akses Remote Smartphone](docs/screenshots/bingkai_remote.png)
+
+### Navigasi Pintasan Controller Gamepad (PlayStation & Xbox)
+![Dukungan Stick Gamepad](docs/screenshots/bingkai_gamepad.png)
+
+---
 ---
 
 ## Fitur Utama
